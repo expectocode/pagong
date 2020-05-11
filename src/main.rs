@@ -1,7 +1,10 @@
 use std::error::Error;
-use std::ffi::OsStr;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+const DEFAULT_CONTENT_PATH: &str = "content";
+const HEADER_FILE_NAME: &str = "header.md";
+const FOOTER_FILE_NAME: &str = "footer.md";
 
 #[derive(Debug)]
 struct Blog {
@@ -24,7 +27,7 @@ struct PostSource {
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let input = Path::new("content");
+    let input = Path::new(DEFAULT_CONTENT_PATH);
 
     let mut posts = vec![];
     let mut header = None;
@@ -34,12 +37,14 @@ fn main() -> Result<(), Box<dyn Error>> {
         let child = child?;
         let path = child.path();
 
-        if path.file_name() == Some(OsStr::new("header.md")) {
-            header = Some(path);
-            continue;
-        } else if path.file_name() == Some(OsStr::new("footer.md")) {
-            footer = Some(path);
-            continue;
+        if let Some(name) = path.file_name() {
+            if name == HEADER_FILE_NAME {
+                header = Some(path);
+                continue;
+            } else if name == FOOTER_FILE_NAME {
+                footer = Some(path);
+                continue;
+            }
         }
 
         let metadata = fs::metadata(&path)?;

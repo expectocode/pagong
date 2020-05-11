@@ -7,7 +7,7 @@ const HEADER_FILE_NAME: &str = "header.md";
 const FOOTER_FILE_NAME: &str = "footer.md";
 
 #[derive(Debug)]
-struct Blog {
+struct BlogSource {
     posts: Vec<PostSource>,
     header: Option<PathBuf>,
     footer: Option<PathBuf>,
@@ -26,8 +26,8 @@ struct PostSource {
     path: PathBuf,
 }
 
-fn main() -> Result<(), Box<dyn Error>> {
-    let input = Path::new(DEFAULT_CONTENT_PATH);
+fn get_source_files(content_dir: &str) -> Result<BlogSource, Box<dyn Error>> {
+    let input = Path::new(content_dir);
 
     let mut posts = vec![];
     let mut header = None;
@@ -65,13 +65,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         });
     }
 
-    let blog = Blog {
+    Ok(BlogSource {
         posts,
         header,
         footer,
-    };
+    })
+}
 
-    dbg!(blog);
+fn main() -> Result<(), Box<dyn Error>> {
+    let source = get_source_files(DEFAULT_CONTENT_PATH)?;
+    dbg!(source);
 
     todo!()
 }

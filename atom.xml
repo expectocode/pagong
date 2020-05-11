@@ -1,0 +1,89 @@
+<feed xmlns="http://www.w3.org/2005/Atom"><title>tortuga</title><id>tortuga</id><updated>2020-05-28T22:00:00+00:00</updated><entry><title>Tortuga </title><id>dist/README/index.html</id><updated>2020-05-28T22:00:00+00:00</updated><published>2020-05-28T22:00:00+00:00</published><summary>Write markdown, get a static site</summary><content type="html" src="dist/README/index.html">&lt;!DOCTYPE html&gt;
+&lt;html&gt;
+&lt;head&gt;
+&lt;meta charset=&quot;utf-8&quot; /&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot; /&gt;
+&lt;title&gt;Tortuga &lt;/title&gt;
+&lt;link rel=&quot;stylesheet&quot; href=&quot;../css/style.css&quot;&gt;
+&lt;/head&gt;
+&lt;body&gt;
+&lt;main&gt;
+&lt;h1 class=&quot;title&quot; id=&quot;tortuga_&quot;&gt;&lt;a class=&quot;anchor&quot; href=&quot;#tortuga_&quot;&gt;¶&lt;/a&gt;Tortuga &lt;img src=&quot;logo.svg&quot; alt=&quot;tortuga's logo&quot; /&gt;&lt;/h1&gt;
+&lt;div class=&quot;date-created-modified&quot;&gt;2020-05-29&lt;/div&gt;
+&lt;blockquote&gt;
+&lt;p&gt;&lt;em&gt;Write markdown, get a static site&lt;/em&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;p&gt;This project is a bit of a work in progress. Expect more nice things to come!&lt;/p&gt;
+&lt;h2 id=&quot;getting_started&quot;&gt;&lt;a class=&quot;anchor&quot; href=&quot;#getting_started&quot;&gt;¶&lt;/a&gt;Getting started&lt;/h2&gt;
+&lt;h3 id=&quot;installation&quot;&gt;&lt;a class=&quot;anchor&quot; href=&quot;#installation&quot;&gt;¶&lt;/a&gt;Installation&lt;/h3&gt;
+&lt;p&gt;Install &lt;code&gt;tortuga&lt;/code&gt; by running the following command on a terminal:&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-sh&quot;&gt;cargo install --git https://github.com/expectocode/tortuga
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Then use it in your blog's root folder:&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-sh&quot;&gt;tortuga
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;It's that simple!&lt;/p&gt;
+&lt;h3 id=&quot;blog_structure&quot;&gt;&lt;a class=&quot;anchor&quot; href=&quot;#blog_structure&quot;&gt;¶&lt;/a&gt;Blog structure&lt;/h3&gt;
+&lt;p&gt;For &lt;code&gt;tortuga&lt;/code&gt; to do anything useful, you need to have some entries for your blog. These should be written in markdown and saved in the &lt;code&gt;content/&lt;/code&gt; directory as &lt;code&gt;.md&lt;/code&gt; files. For example:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;myblog/
+└── content/
+    ├── hello-world.md
+    └── style.css
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Running &lt;code&gt;tortuga&lt;/code&gt; while inside &lt;code&gt;myblog&lt;/code&gt; will create the following &lt;code&gt;dist/&lt;/code&gt; folder, and the tree of your blog now looks like this:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;myblog/
+├── content/
+│   ├── hello-world.md
+│   └── style.css
+└── dist/
+    ├── atom.xml
+    ├── css/
+    │   └── style.css
+    ├── hello-world/
+    │   └── index.html
+    └── index.html
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Now you can move the contents of &lt;code&gt;dist/&lt;/code&gt; to wherever you host your site and enjoy it.&lt;/p&gt;
+&lt;h3 id=&quot;styling&quot;&gt;&lt;a class=&quot;anchor&quot; href=&quot;#styling&quot;&gt;¶&lt;/a&gt;Styling&lt;/h3&gt;
+&lt;p&gt;We provide a &lt;a href=&quot;https://raw.githubusercontent.com/expectocode/tortuga/master/style.css&quot;&gt;default &lt;code&gt;style.css&lt;/code&gt;&lt;/a&gt; that you need to copy into your &lt;code&gt;content/&lt;/code&gt; folder if you want your blog to look pretty. This is completely optional, and you can also write your own if you want.&lt;/p&gt;
+&lt;h2 id=&quot;customization&quot;&gt;&lt;a class=&quot;anchor&quot; href=&quot;#customization&quot;&gt;¶&lt;/a&gt;Customization&lt;/h2&gt;
+&lt;h3 id=&quot;assets&quot;&gt;&lt;a class=&quot;anchor&quot; href=&quot;#assets&quot;&gt;¶&lt;/a&gt;Assets&lt;/h3&gt;
+&lt;p&gt;If you want to embed assets into your blog entries, create a directory for the entry instead, and put the text contents inside &lt;code&gt;post.md&lt;/code&gt;. Then, include any assets you want in the same folder:&lt;/p&gt;
+&lt;pre&gt;&lt;code&gt;myblog/
+└── content
+    └── hello-world
+        ├── asset.jpg
+        └── post.md
+&lt;/code&gt;&lt;/pre&gt;
+&lt;p&gt;Inside &lt;code&gt;post.md&lt;/code&gt;, you can simply refer to &lt;code&gt;asset.jpg&lt;/code&gt; to make use of it:&lt;/p&gt;
+&lt;pre&gt;&lt;code class=&quot;language-md&quot;&gt;# Hello, world!
+
+![A beautiful asset.](asset.jpg)
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h3 id=&quot;post_metadata&quot;&gt;&lt;a class=&quot;anchor&quot; href=&quot;#post_metadata&quot;&gt;¶&lt;/a&gt;Post metadata&lt;/h3&gt;
+&lt;p&gt;Post metadata is included within the &lt;code&gt;.md&lt;/code&gt; itself as a fenced block with the &lt;code&gt;&amp;quot;meta&amp;quot;&lt;/code&gt; language at the beginning of the post's content. This code block won't be directly visible in the generated HTML, but will instruct &lt;code&gt;tortuga&lt;/code&gt; how to do certain things. For example, in &lt;code&gt;post.md&lt;/code&gt;:&lt;/p&gt;
+&lt;pre&gt;
+```meta
+created: 2020-02-20
+```
+
+# My blog post
+
+Welcome!
+&lt;/pre&gt;
+&lt;p&gt;The meta definitions are key-value pairs, separated by the &lt;code&gt;:&lt;/code&gt; character, and the valid keys are:&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;created&lt;/code&gt; or &lt;code&gt;published&lt;/code&gt;: overrides the creation date of the entry, in &lt;code&gt;YYYY-mm-dd&lt;/code&gt; format.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;modified&lt;/code&gt; or &lt;code&gt;updated&lt;/code&gt;: overrides the date of the last update of the entry, in &lt;code&gt;YYYY-mm-dd&lt;/code&gt; format.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;title&lt;/code&gt;: overrides the title of the post.&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;path&lt;/code&gt;: overrides the path of the post (so that the URL can be different from the file name).&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&quot;naming_convention&quot;&gt;&lt;a class=&quot;anchor&quot; href=&quot;#naming_convention&quot;&gt;¶&lt;/a&gt;Naming convention&lt;/h3&gt;
+&lt;p&gt;The names for the metadata keys or classes to be used in the CSS should generally be the obvious thing you would expect.&lt;/p&gt;
+&lt;h2 id=&quot;license&quot;&gt;&lt;a class=&quot;anchor&quot; href=&quot;#license&quot;&gt;¶&lt;/a&gt;License&lt;/h2&gt;
+&lt;p&gt;Tortuga is licensed under either of Apache License, Version 2.0 or MIT license at your option.&lt;/p&gt;
+&lt;p&gt;Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this crate by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.&lt;/p&gt;
+&lt;/main&gt;
+&lt;/body&gt;
+&lt;/html&gt;
+ </content></entry></feed>

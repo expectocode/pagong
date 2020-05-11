@@ -1,6 +1,6 @@
 use std::error::Error;
 use std::fs;
-use std::io::Read;
+use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use pulldown_cmark::{html, Parser};
@@ -29,6 +29,31 @@ struct PostSource {
     path: PathBuf,
 }
 
+impl BlogSource {
+    fn footer_content(&self) -> io::Result<String> {
+        match &self.footer {
+            None => Ok("".into()),
+            Some(path) => get_content(&path),
+        }
+    }
+
+    fn header_content(&self) -> io::Result<String> {
+        match &self.header {
+            None => Ok("".into()),
+            Some(path) => get_content(&path),
+        }
+    }
+}
+
+impl PostSource {
+    fn content(&self) -> io::Result<String> {
+        match self.source_type {
+            File => get_content(&self.path),
+            Folder => get_content(&self.path.join(Path::new("post.md"))),
+        }
+    }
+}
+
 fn get_source_files(content_dir: &str) -> Result<BlogSource, Box<dyn Error>> {
     let input = Path::new(content_dir);
 
@@ -51,10 +76,7 @@ fn get_source_files(content_dir: &str) -> Result<BlogSource, Box<dyn Error>> {
         }
 
         let metadata = fs::metadata(&path)?;
-        dbg!(&child);
-        dbg!(&metadata.is_file());
-
-        let file_type = if metadata.is_file() {
+        let file_type = if fs::metadata(&path)?.is_file() {
             File
         } else if metadata.is_dir() {
             Folder
@@ -76,7 +98,7 @@ fn get_source_files(content_dir: &str) -> Result<BlogSource, Box<dyn Error>> {
 }
 
 fn translate_to_html(header: &str, body: &str, footer: &str) -> String {
-    let input: String = header.to_string() + body + footer;
+    let input: String = header.to_string() + "\n" + body + "\n" + footer;
     let parser = Parser::new(&input); // TODO options
 
     let mut output = String::new();
@@ -85,30 +107,23 @@ fn translate_to_html(header: &str, body: &str, footer: &str) -> String {
     output
 }
 
-fn get_contents(path: &Path) -> std::io::Result<String> {
+fn get_content(path: &Path) -> io::Result<String> {
     let mut file = fs::File::open(path)?;
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-    Ok(contents)
+    let mut content = String::new();
+    file.read_to_string(&mut content)?;
+    Ok(content)
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let source = get_source_files(DEFAULT_CONTENT_PATH)?;
-    dbg!(&source);
 
-    let header = match source.header {
-        None => "".into(),
-        Some(path) => get_contents(&path)?,
-    };
-    let footer = match source.footer {
-        None => "".into(),
-        Some(path) => get_contents(&path)?,
-    };
+    let header = source.header_content()?;
+    let footer = source.footer_content()?;
 
-    let first_file_post = source.posts.iter().find(|ps| ps.source_type == File).unwrap();
-    let body = get_contents(&first_file_post.path)?;
-
-    dbg!(translate_to_html(&header, &body, &footer));
+    for post in source.posts.iter() {
+        let body = post.content()?;
+        println!("{}", translate_to_html(&header, &body, &footer));
+    }
 
     todo!()
 }

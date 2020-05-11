@@ -8,3 +8,4 @@ edition = "2018"
 
 [dependencies]
 pulldown-cmark = "0.7.1"
+chrono = "0.4.11"

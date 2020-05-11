@@ -4,6 +4,8 @@ use std::fs;
 use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
+use chrono::offset::Local;
+use chrono::DateTime;
 use pulldown_cmark::{html, Parser};
 
 const DEFAULT_CONTENT_PATH: &str = "content";
@@ -47,19 +49,48 @@ impl BlogSource {
     }
 }
 
-impl PostSource {
-    fn content(&self) -> io::Result<String> {
-        match self.source_type {
-            File => get_content(&self.path),
-            Folder => get_content(&self.path.join(FOLDER_POST_NAME)),
-        }
-    }
+#[derive(Debug)]
+struct Post {
+    source: PostSource,
+    markdown: String,
+    title: String,
+    modified: DateTime<Local>,
+    created: DateTime<Local>,
+    assets: Vec<PathBuf>,
+}
 
-    fn file_name(&self) -> Result<&OsStr, &'static str> {
-        match self.path.file_name() {
-            None => Err("Invalid post file name"),
-            Some(name) => Ok(name),
+impl Post {
+    fn from_post_source(source: PostSource) -> Result<Post, Box<dyn Error>> {
+        let post_path = match source.source_type {
+            File => source.path.clone(),
+            Folder => source.path.join(FOLDER_POST_NAME),
+        };
+
+        let content = get_content(&post_path)?;
+
+        let post_metadata = post_path.metadata()?;
+        let created = post_metadata.created()?.into();
+        let modified = post_metadata.modified()?.into();
+
+        let mut assets = vec![];
+        if let Folder = source.source_type {
+            for child in fs::read_dir(&source.path)? {
+                let child = child?;
+                if child.path().extension() != Some(&OsStr::new("md")) {
+                    // don't add .md files as assets
+                    assets.push(child.path());
+                }
+            }
         }
+
+        Ok(Post {
+            source,
+            markdown: content,
+            title: "Title".into(), // TODO
+            modified,
+            created,
+            assets,
+        })
     }
 }
 
@@ -147,14 +178,31 @@ fn main() -> Result<(), Box<dyn Error>> {
     let header = source.header_content()?;
     let footer = source.footer_content()?;
 
-    for post in source.posts.iter() {
-        let body = post.content()?;
+    for post_source in source.posts.into_iter() {
+        let post = Post::from_post_source(post_source)?;
 
-        let mut out_path = output_dir.join(post.file_name()?); // TODO override name with metadata
-        out_path.set_extension("html");
-        let mut out = fs::File::create(out_path)?;
+        // TODO override name with metadata
+        let post_file_stem = post
+            .source
+            .path
+            .file_stem()
+            .expect("Post must have filename");
+        let post_dir = output_dir.join(post_file_stem);
+        if post_dir.exists() {
+            fs::remove_dir_all(&post_dir)?;
+        }
+        fs::create_dir(&post_dir)?;
 
-        let html = translate_to_html(&header, &body, &footer);
+        let post_path = post_dir.join("index.html");
+        let mut out = fs::File::create(post_path)?;
+
+        let html = translate_to_html(&header, &post.markdown, &footer);
+
+        for asset in post.assets {
+            let asset_name = asset.file_name().expect("Asset must have file name");
+            let dest_path = post_dir.join(asset_name);
+            fs::copy(asset, dest_path).expect("File copy failed");
+        }
 
         out.write(html.as_bytes())?;
     }

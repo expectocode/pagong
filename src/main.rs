@@ -127,6 +127,22 @@ fn main() -> Result<(), Box<dyn Error>> {
     let source = get_source_files(DEFAULT_CONTENT_PATH)?;
 
     let output_dir = Path::new("dist");
+    if !output_dir.exists() {
+        eprintln!(
+            "Creating output directory \"{}\"...",
+            output_dir.to_string_lossy()
+        );
+        fs::create_dir(output_dir)?;
+    }
+    if !output_dir.is_dir() {
+        return Err(Box::new(io::Error::new(
+            io::ErrorKind::AlreadyExists,
+            format!(
+                "Output directory name {} is already taken by a file. Please move or remove it",
+                output_dir.to_string_lossy()
+            ),
+        )));
+    }
 
     let header = source.header_content()?;
     let footer = source.footer_content()?;

@@ -8,6 +8,7 @@ use pulldown_cmark::{html, Parser};
 const DEFAULT_CONTENT_PATH: &str = "content";
 const HEADER_FILE_NAME: &str = "header.md";
 const FOOTER_FILE_NAME: &str = "footer.md";
+const FOLDER_POST_NAME: &str = "post.md";
 
 #[derive(Debug)]
 struct BlogSource {
@@ -49,7 +50,7 @@ impl PostSource {
     fn content(&self) -> io::Result<String> {
         match self.source_type {
             File => get_content(&self.path),
-            Folder => get_content(&self.path.join(Path::new("post.md"))),
+            Folder => get_content(&self.path.join(FOLDER_POST_NAME))
         }
     }
 }

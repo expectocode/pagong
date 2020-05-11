@@ -1,6 +1,7 @@
 use std::error::Error;
+use std::ffi::OsStr;
 use std::fs;
-use std::io::{self, Read};
+use std::io::{self, Read, Write};
 use std::path::{Path, PathBuf};
 
 use pulldown_cmark::{html, Parser};
@@ -50,7 +51,14 @@ impl PostSource {
     fn content(&self) -> io::Result<String> {
         match self.source_type {
             File => get_content(&self.path),
-            Folder => get_content(&self.path.join(FOLDER_POST_NAME))
+            Folder => get_content(&self.path.join(FOLDER_POST_NAME)),
+        }
+    }
+
+    fn file_name(&self) -> Result<&OsStr, &'static str> {
+        match self.path.file_name() {
+            None => Err("Invalid post file name"),
+            Some(name) => Ok(name),
         }
     }
 }
@@ -118,12 +126,21 @@ fn get_content(path: &Path) -> io::Result<String> {
 fn main() -> Result<(), Box<dyn Error>> {
     let source = get_source_files(DEFAULT_CONTENT_PATH)?;
 
+    let output_dir = Path::new("dist");
+
     let header = source.header_content()?;
     let footer = source.footer_content()?;
 
     for post in source.posts.iter() {
         let body = post.content()?;
-        println!("{}", translate_to_html(&header, &body, &footer));
+
+        let mut out_path = output_dir.join(post.file_name()?); // TODO override name with metadata
+        out_path.set_extension("html");
+        let mut out = fs::File::create(out_path)?;
+
+        let html = translate_to_html(&header, &body, &footer);
+
+        out.write(html.as_bytes())?;
     }
 
     todo!()

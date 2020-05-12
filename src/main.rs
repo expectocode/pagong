@@ -3,7 +3,7 @@ mod post;
 
 use std::error::Error;
 use std::fs;
-use std::io::{self};
+use std::io;
 use std::path::Path;
 
 pub use blog::Blog;

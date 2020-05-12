@@ -3,7 +3,6 @@ use crate::FOLDER_POST_NAME;
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fs;
-use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
 use chrono::offset::Local;
@@ -19,16 +18,9 @@ pub struct Post {
     pub assets: Vec<PathBuf>,
 }
 
-fn get_content(path: &Path) -> io::Result<String> {
-    let mut file = fs::File::open(path)?;
-    let mut content = String::new();
-    file.read_to_string(&mut content)?;
-    Ok(content)
-}
-
 impl Post {
     pub fn from_source_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
-        let metadata = fs::metadata(path)?;
+        let metadata = fs::metadata(path.as_ref())?;
         let post_path = if metadata.is_file() {
             path.as_ref().to_path_buf()
         } else if metadata.is_dir() {
@@ -37,7 +29,7 @@ impl Post {
             unreachable!("Followed symlink is not file or directory");
         };
 
-        let content = get_content(&post_path)?;
+        let content = fs::read_to_string(&post_path)?;
 
         let post_metadata = post_path.metadata()?;
         let created = post_metadata.created()?.into();
@@ -45,7 +37,7 @@ impl Post {
 
         let mut assets = vec![];
         if metadata.is_dir() {
-            for child in fs::read_dir(path)? {
+            for child in fs::read_dir(path.as_ref())? {
                 let child = child?;
                 if child.path().extension() != Some(&OsStr::new("md")) {
                     // don't add .md files as assets
@@ -55,7 +47,7 @@ impl Post {
         }
 
         Ok(Post {
-            source: todo!(),
+            source: path.as_ref().to_path_buf(),
             markdown: content,
             title: "Title".into(), // TODO
             modified,

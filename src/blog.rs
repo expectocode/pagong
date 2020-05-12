@@ -2,8 +2,7 @@ use crate::{Post, FOOTER_FILE_NAME, HEADER_FILE_NAME};
 
 use std::error::Error;
 use std::fs;
-use std::io::{BufWriter, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 // TODO we don't handle title and other metadata like tags
 // TODO if we want to do this proper we should not put header inside main
@@ -26,6 +25,30 @@ pub struct Blog {
     pub header: Option<String>,
     pub footer: Option<String>,
 }
+
+#[derive(Debug)]
+pub enum FsAction {
+    Copy {
+        source: PathBuf,
+        dest: PathBuf,
+    },
+    DeleteDir {
+        path: PathBuf,
+        not_exists_ok: bool,
+        recursive: bool,
+    },
+    CreateDir {
+        path: PathBuf,
+        exists_ok: bool,
+    },
+
+    /// Creates file if it does not exist, overwrites if it does exist.
+    WriteFile {
+        path: PathBuf,
+        content: String,
+    },
+}
+use FsAction::*;
 
 impl Blog {
     pub fn from_source_dir<P: AsRef<Path>>(root: P) -> Result<Self, Box<dyn Error>> {
@@ -57,36 +80,44 @@ impl Blog {
         })
     }
 
-    pub fn generate<P: AsRef<Path>>(&self, root: P) -> Result<(), Box<dyn Error>> {
+    pub fn generate_actions<P: AsRef<Path>>(&self, root: P) -> Vec<FsAction> {
+        let mut actions = vec![];
+
         for post in self.posts.iter() {
             // TODO override name with metadata
             let post_file_stem = post.source.file_stem().expect("Post must have filename");
             let post_dir = root.as_ref().join(post_file_stem);
-            if post_dir.exists() {
-                fs::remove_dir_all(&post_dir)?;
-            }
-            fs::create_dir(&post_dir)?;
+            actions.push(DeleteDir {
+                path: post_dir.clone(),
+                not_exists_ok: true,
+                recursive: true,
+            });
+            actions.push(CreateDir {
+                path: post_dir.clone(),
+                exists_ok: false,
+            });
 
             let post_path = post_dir.join("index.html");
-            let mut out = BufWriter::new(fs::File::create(post_path)?);
-            write!(out, "{}", HTML_START)?;
-            if let Some(header) = &self.header {
-                write!(out, "{}", header)?;
-            }
-            post.write_html(&mut out)?;
-            if let Some(footer) = &self.footer {
-                write!(out, "{}", footer)?;
-            }
-            write!(out, "{}", HTML_END)?;
-            drop(out);
+
+            let mut file_content = String::new();
+            file_content.push_str(HTML_START);
+            file_content.push_str(&self.header.as_ref().unwrap_or(&String::new()));
+            post.push_html(&mut file_content);
+            file_content.push_str(&self.footer.as_ref().unwrap_or(&String::new()));
+            file_content.push_str(HTML_END);
+
+            actions.push(WriteFile{path: post_path, content: file_content});
 
             for asset in post.assets.iter() {
                 let asset_name = asset.file_name().expect("Asset must have file name");
                 let dest_path = post_dir.join(asset_name);
-                fs::copy(asset, dest_path).expect("File copy failed");
+                actions.push(Copy {
+                    source: asset.into(),
+                    dest: dest_path,
+                });
             }
         }
 
-        Ok(())
+        actions
     }
 }

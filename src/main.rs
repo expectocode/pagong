@@ -35,7 +35,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         )));
     }
 
-    blog.generate(output_dir)?;
+    let actions = blog.generate_actions(output_dir);
+    dbg!(&actions);
 
     todo!()
 }

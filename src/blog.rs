@@ -106,7 +106,10 @@ impl Blog {
             file_content.push_str(&self.footer.as_ref().unwrap_or(&String::new()));
             file_content.push_str(HTML_END);
 
-            actions.push(WriteFile{path: post_path, content: file_content});
+            actions.push(WriteFile {
+                path: post_path,
+                content: file_content,
+            });
 
             for asset in post.assets.iter() {
                 let asset_name = asset.file_name().expect("Asset must have file name");

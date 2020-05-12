@@ -1,6 +1,6 @@
 use crate::FOLDER_POST_NAME;
 
-use pulldown_cmark::{html, Parser};
+use pulldown_cmark::{html, Event, Parser, Tag};
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fs;
@@ -47,10 +47,23 @@ impl Post {
             }
         }
 
+        let mut title = None;
+        let mut wait_title = false;
+        for event in Parser::new(&content) {
+            match event {
+                Event::Start(Tag::Heading(1)) => wait_title = true,
+                Event::Text(string) if wait_title => {
+                    title = Some(string.to_string());
+                    break;
+                }
+                _ => {}
+            }
+        }
+
         Ok(Post {
             source: path.as_ref().to_path_buf(),
             markdown: content,
-            title: "Title".into(), // TODO
+            title: title.unwrap_or_else(|| "(no title)".to_string()),
             modified,
             created,
             assets,

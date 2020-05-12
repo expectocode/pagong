@@ -1,33 +1,37 @@
 use crate::{Post, FOOTER_FILE_NAME, HEADER_FILE_NAME};
 
-use pulldown_cmark::{html, Parser};
 use std::error::Error;
 use std::fs;
-use std::io::Write;
+use std::io::{BufWriter, Write};
 use std::path::Path;
+
+// TODO we don't handle title and other metadata like tags
+// TODO if we want to do this proper we should not put header inside main
+const HTML_START: &str = r#"<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+</head>
+<body>
+    <main>
+"#;
+
+const HTML_END: &str = r#"    </main>
+</body>
+"#;
 
 #[derive(Debug)]
 pub struct Blog {
     pub posts: Vec<Post>,
-    pub header: String,
-    pub footer: String,
-}
-
-fn translate_to_html(header: &str, body: &str, footer: &str) -> String {
-    let input: String = header.to_string() + "\n" + body + "\n" + footer;
-    let parser = Parser::new(&input); // TODO options
-
-    let mut output = String::new();
-    html::push_html(&mut output, parser);
-
-    output
+    pub header: Option<String>,
+    pub footer: Option<String>,
 }
 
 impl Blog {
     pub fn from_source_dir<P: AsRef<Path>>(root: P) -> Result<Self, Box<dyn Error>> {
         let mut posts = vec![];
-        let mut header = "".to_string();
-        let mut footer = "".to_string();
+        let mut header = None;
+        let mut footer = None;
 
         for child in fs::read_dir(root)? {
             let child = child?;
@@ -35,10 +39,10 @@ impl Blog {
 
             if let Some(name) = path.file_name() {
                 if name == HEADER_FILE_NAME {
-                    header = fs::read_to_string(path)?;
+                    header = Some(fs::read_to_string(path)?);
                     continue;
                 } else if name == FOOTER_FILE_NAME {
-                    footer = fs::read_to_string(path)?;
+                    footer = Some(fs::read_to_string(path)?);
                     continue;
                 }
             }
@@ -64,17 +68,23 @@ impl Blog {
             fs::create_dir(&post_dir)?;
 
             let post_path = post_dir.join("index.html");
-            let mut out = fs::File::create(post_path)?;
-
-            let html = translate_to_html(&self.header, &post.markdown, &self.footer);
+            let mut out = BufWriter::new(fs::File::create(post_path)?);
+            write!(out, "{}", HTML_START)?;
+            if let Some(header) = &self.header {
+                write!(out, "{}", header)?;
+            }
+            post.write_html(&mut out)?;
+            if let Some(footer) = &self.footer {
+                write!(out, "{}", footer)?;
+            }
+            write!(out, "{}", HTML_END)?;
+            drop(out);
 
             for asset in post.assets.iter() {
                 let asset_name = asset.file_name().expect("Asset must have file name");
                 let dest_path = post_dir.join(asset_name);
                 fs::copy(asset, dest_path).expect("File copy failed");
             }
-
-            out.write(html.as_bytes())?;
         }
 
         Ok(())

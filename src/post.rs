@@ -1,8 +1,10 @@
 use crate::FOLDER_POST_NAME;
 
+use pulldown_cmark::{html, Parser};
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 use chrono::offset::Local;
@@ -54,5 +56,11 @@ impl Post {
             created,
             assets,
         })
+    }
+
+    pub fn write_html<W: Write>(&self, out: W) -> Result<(), Box<dyn Error>> {
+        let parser = Parser::new(&self.markdown);
+        html::write_html(out, parser)?;
+        Ok(())
     }
 }

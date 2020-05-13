@@ -19,10 +19,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     let output_dir = Path::new("dist");
     if !output_dir.exists() {
-        eprintln!(
-            "Creating output directory \"{}\"...",
-            output_dir.to_string_lossy()
-        );
+        eprintln!( "Creating output directory \"{}\"...", output_dir.to_string_lossy());
         fs::create_dir(output_dir)?;
     }
     if !output_dir.is_dir() {

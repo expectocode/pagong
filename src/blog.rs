@@ -152,6 +152,7 @@ mod tests {
     // executor so that we can test for results rather than individual actions.
     use super::*;
     use chrono::offset::Local;
+    use std::collections::HashMap;
 
     #[test]
     fn standalone_file_post_generated() {
@@ -159,6 +160,7 @@ mod tests {
             posts: vec![Post {
                 source: "/path/to/content/test_post.md".into(),
                 markdown: "A test post".into(),
+                meta: HashMap::new(),
                 title: "A test post title".into(),
                 modified: Local::now(),
                 created: Local::now(),

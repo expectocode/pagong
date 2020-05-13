@@ -1,6 +1,7 @@
 use crate::FOLDER_POST_NAME;
 
 use pulldown_cmark::{html, Event, Parser, Tag};
+use std::collections::HashMap;
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fs;
@@ -13,6 +14,7 @@ use chrono::DateTime;
 pub struct Post {
     pub source: PathBuf,
     pub markdown: String,
+    pub meta: HashMap<String, String>,
     pub title: String,
     pub modified: DateTime<Local>,
     pub created: DateTime<Local>,
@@ -61,9 +63,36 @@ impl Post {
             }
         }
 
+        // Parse meta overrides
+        let mut meta = HashMap::new();
+        let mut lines = content.split('\n');
+        if let Some("```meta") = lines.next() {
+            loop {
+                let line = lines.next().expect("Unexpected EOF while parsing meta");
+                if line == "```" {
+                    break;
+                }
+                let mut kv = line.splitn(2, ':');
+                let key = kv.next().unwrap();
+                let value = kv
+                    .next()
+                    .expect(&format!("Meta line \"{}\" should contain a colon", line));
+                meta.insert(key.into(), value.into());
+            }
+            dbg!(&meta);
+        }
+        // TODO actually parse the meta keys & values
+
+        // Store everything after the meta info on the Post. Re-join with newlines.
+        let content = {
+            let lines: Vec<String> = lines.map(str::to_string).collect();
+            lines.join("\n")
+        };
+
         Ok(Post {
             source: path.as_ref().to_path_buf(),
             markdown: content,
+            meta,
             title: title.unwrap_or_else(|| "(no title)".to_string()),
             modified,
             created,

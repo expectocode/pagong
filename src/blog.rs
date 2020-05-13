@@ -124,3 +124,52 @@ impl Blog {
         actions
     }
 }
+
+#[cfg(test)]
+mod tests {
+    // If FsAction stuff gets more complex, it might be worth implementing a mock
+    // executor so that we can test for results rather than individual actions.
+    use super::*;
+    use chrono::offset::Local;
+
+    #[test]
+    fn standalone_file_post_generated() {
+        let blog = Blog {
+            posts: vec![Post {
+                source: "/path/to/content/test_post.md".into(),
+                markdown: "A test post".into(),
+                title: "A test post title".into(),
+                modified: Local::now(),
+                created: Local::now(),
+                assets: vec![],
+            }],
+            header: None,
+            footer: None,
+        };
+
+        let actions = blog.generate_actions("dist");
+
+        assert_eq!(actions.len(), 3);
+        assert!(matches!(&actions[0] ,
+           DeleteDir {
+            path,
+            not_exists_ok: true,
+            recursive: true
+           } if path == Path::new("dist/test_post")
+        ));
+
+        assert!(matches!(&actions[1] ,
+           CreateDir {
+            path,
+            ..
+           } if path == Path::new("dist/test_post")
+        ));
+
+        assert!(matches!(&actions[2] ,
+           WriteFile {
+            path,
+            content
+           } if path == Path::new("dist/test_post/index.html") && content.contains("A test post")
+        ));
+    }
+}

@@ -169,7 +169,7 @@ mod tests {
            WriteFile {
             path,
             content
-           } if path == Path::new("dist/test_post/index.html") && content.contains("A test post")
+           } if path == Path::new("dist/test_post/index.html") && content.contains("A test poop")
         ));
     }
 }

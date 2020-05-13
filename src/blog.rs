@@ -2,6 +2,7 @@ use crate::{Post, FOOTER_FILE_NAME, HEADER_FILE_NAME};
 
 use std::error::Error;
 use std::fs;
+use std::io;
 use std::path::{Path, PathBuf};
 
 // TODO we don't handle title and other metadata like tags
@@ -50,6 +51,68 @@ pub enum FsAction {
 }
 use FsAction::*;
 
+fn execute_fs_actions(actions: &[FsAction]) -> io::Result<()> {
+    // This code is full of checks which are followed by actions, non-atomically.
+    // This means that it's full of TOCTOU race conditions. I don't know how to avoid that.
+    for action in actions {
+        match action {
+            Copy { source, dest } => {
+                fs::copy(source, dest)?;
+            }
+            DeleteDir {
+                path,
+                not_exists_ok,
+                recursive,
+            } => {
+                let should_fail_if_not_exists = !not_exists_ok;
+                if should_fail_if_not_exists && !path.exists() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::NotFound,
+                        format!("There is nothing to delete at {}", path.to_string_lossy()),
+                    ));
+                }
+                if *recursive {
+                    fs::remove_dir_all(path)?;
+                } else {
+                    // Requires that the directory is empty
+                    fs::remove_dir(path)?;
+                }
+            }
+            CreateDir { path, exists_ok } => {
+                if *exists_ok && path.exists() {
+                    if !path.is_dir() {
+                        return Err(io::Error::new(
+                            io::ErrorKind::AlreadyExists,
+                            format!(
+                                "There is already a file (not a directory) at {}",
+                                path.to_string_lossy()
+                            ),
+                        ));
+                    }
+                    return Ok(());
+                }
+                fs::create_dir(path)?;
+            }
+            WriteFile { path, content } => {
+                if path.exists() && !path.is_file() {
+                    return Err(io::Error::new(
+                        io::ErrorKind::AlreadyExists,
+                        format!(
+                            "There is already a directory (not a file) at {}",
+                            path.to_string_lossy()
+                        ),
+                    ));
+                }
+
+                // fs::write handles creation and truncation for us.
+                fs::write(path, content)?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 impl Blog {
     pub fn from_source_dir<P: AsRef<Path>>(root: P) -> Result<Self, Box<dyn Error>> {
         let mut posts = vec![];
@@ -78,6 +141,11 @@ impl Blog {
             header,
             footer,
         })
+    }
+
+    pub fn generate<P: AsRef<Path>>(&self, root: P) -> io::Result<()> {
+        let actions = self.generate_actions(root);
+        execute_fs_actions(&actions)
     }
 
     pub fn generate_actions<P: AsRef<Path>>(&self, root: P) -> Vec<FsAction> {

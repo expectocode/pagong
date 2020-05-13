@@ -1,3 +1,4 @@
+use crate::fs_action::{execute_fs_actions, FsAction};
 use crate::{Post, CSS_DIR_NAME, CSS_FILE_NAME, FOOTER_FILE_NAME, HEADER_FILE_NAME};
 
 use std::error::Error;
@@ -14,96 +15,6 @@ pub struct Blog {
     pub css_path: Option<PathBuf>,
     pub header: Option<String>,
     pub footer: Option<String>,
-}
-
-#[derive(Debug)]
-pub enum FsAction {
-    Copy {
-        source: PathBuf,
-        dest: PathBuf,
-    },
-    DeleteDir {
-        path: PathBuf,
-        not_exists_ok: bool,
-        recursive: bool,
-    },
-    CreateDir {
-        path: PathBuf,
-        exists_ok: bool,
-    },
-
-    /// Creates file if it does not exist, overwrites if it does exist.
-    WriteFile {
-        path: PathBuf,
-        content: String,
-    },
-}
-use FsAction::*;
-
-fn execute_fs_actions(actions: &[FsAction]) -> io::Result<()> {
-    // This code is full of checks which are followed by actions, non-atomically.
-    // This means that it's full of TOCTOU race conditions. I don't know how to avoid that.
-    for action in actions {
-        dbg!(&action);
-        match action {
-            Copy { source, dest } => {
-                fs::copy(source, dest)?;
-            }
-            DeleteDir {
-                path,
-                not_exists_ok,
-                recursive,
-            } => {
-                let should_fail_if_not_exists = !not_exists_ok;
-                if !path.exists() {
-                    if should_fail_if_not_exists {
-                        return Err(io::Error::new(
-                            io::ErrorKind::NotFound,
-                            format!("There is nothing to delete at {}", path.to_string_lossy()),
-                        ));
-                    }
-                    continue;
-                }
-                if *recursive {
-                    fs::remove_dir_all(path)?;
-                } else {
-                    // Requires that the directory is empty
-                    fs::remove_dir(path)?;
-                }
-            }
-            CreateDir { path, exists_ok } => {
-                if *exists_ok && path.exists() {
-                    if !path.is_dir() {
-                        return Err(io::Error::new(
-                            io::ErrorKind::AlreadyExists,
-                            format!(
-                                "There is already a file (not a directory) at {}",
-                                path.to_string_lossy()
-                            ),
-                        ));
-                    }
-                    return Ok(());
-                }
-                fs::create_dir(path)?;
-            }
-            WriteFile { path, content } => {
-                if path.exists() && !path.is_file() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::AlreadyExists,
-                        format!(
-                            "There is already a directory (not a file) at {}",
-                            path.to_string_lossy()
-                        ),
-                    ));
-                }
-
-                // fs::write handles creation and truncation for us.
-                fs::write(path, content)?;
-            }
-        }
-    }
-
-    Ok(())
 }
 
 fn generate_html(post: &Post, header: &str, footer: &str, css: &str) -> String {
@@ -172,7 +83,6 @@ impl Blog {
 
     pub fn generate<P: AsRef<Path>>(&self, root: P) -> io::Result<()> {
         let actions = self.generate_actions(root);
-        dbg!(&actions);
         execute_fs_actions(&actions)
     }
 
@@ -182,32 +92,31 @@ impl Blog {
         if let Some(css_source) = &self.css_path {
             let css_path = root.as_ref().join(CSS_DIR_NAME);
 
-            actions.push(DeleteDir {
+            actions.push(FsAction::DeleteDir {
                 path: css_path.clone(),
                 not_exists_ok: true,
                 recursive: true,
             });
-            actions.push(CreateDir {
+            actions.push(FsAction::CreateDir {
                 path: css_path.clone(),
                 exists_ok: false,
             });
-            actions.push(Copy {
+            actions.push(FsAction::Copy {
                 source: css_source.clone(),
                 dest: css_path.join(CSS_FILE_NAME),
             });
-            dbg!(&actions);
         }
 
         for post in self.posts.iter() {
             // TODO override name with metadata
             let post_file_stem = post.source.file_stem().expect("Post must have filename");
             let post_dir = root.as_ref().join(post_file_stem);
-            actions.push(DeleteDir {
+            actions.push(FsAction::DeleteDir {
                 path: post_dir.clone(),
                 not_exists_ok: true,
                 recursive: true,
             });
-            actions.push(CreateDir {
+            actions.push(FsAction::CreateDir {
                 path: post_dir.clone(),
                 exists_ok: false,
             });
@@ -218,7 +127,7 @@ impl Blog {
             let header = self.header.as_ref().map(|s| s.as_str()).unwrap_or("");
             let footer = self.footer.as_ref().map(|s| s.as_str()).unwrap_or("");
 
-            actions.push(WriteFile {
+            actions.push(FsAction::WriteFile {
                 path: post_path,
                 content: generate_html(post, header, footer, &css),
             });
@@ -226,7 +135,7 @@ impl Blog {
             for asset in post.assets.iter() {
                 let asset_name = asset.file_name().expect("Asset must have file name");
                 let dest_path = post_dir.join(asset_name);
-                actions.push(Copy {
+                actions.push(FsAction::Copy {
                     source: asset.into(),
                     dest: dest_path,
                 });
@@ -264,7 +173,7 @@ mod tests {
 
         assert_eq!(actions.len(), 3);
         assert!(matches!(&actions[0] ,
-           DeleteDir {
+           FsAction::DeleteDir {
             path,
             not_exists_ok: true,
             recursive: true
@@ -272,14 +181,14 @@ mod tests {
         ));
 
         assert!(matches!(&actions[1] ,
-           CreateDir {
+          FsAction::CreateDir {
             path,
             ..
            } if path == Path::new("dist/test_post")
         ));
 
         assert!(matches!(&actions[2] ,
-           WriteFile {
+           FsAction::WriteFile {
             path,
             content
            } if path == Path::new("dist/test_post/index.html") && content.contains("A test post")

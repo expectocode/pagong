@@ -20,11 +20,12 @@ pub struct Post {
 }
 
 impl Post {
+    /// Construct a post from a standalone title.md or a title/ directory
+    /// containing a post.md and optional assets.
     pub fn from_source_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
-        let metadata = fs::metadata(path.as_ref())?;
-        let post_path = if metadata.is_file() {
+        let post_path = if path.as_ref().is_file() {
             path.as_ref().to_path_buf()
-        } else if metadata.is_dir() {
+        } else if path.as_ref().is_dir() {
             path.as_ref().join(FOLDER_POST_NAME)
         } else {
             unreachable!("Followed symlink is not file or directory");
@@ -37,7 +38,7 @@ impl Post {
         let modified = post_metadata.modified()?.into();
 
         let mut assets = vec![];
-        if metadata.is_dir() {
+        if path.as_ref().is_dir() {
             for child in fs::read_dir(path.as_ref())? {
                 let child = child?;
                 if child.path().extension() != Some(&OsStr::new("md")) {

@@ -155,6 +155,45 @@ mod tests {
     use std::collections::HashMap;
 
     #[test]
+    fn css_file_copied() {
+        let source_css_file = Path::new("path/to/content/").join(CSS_FILE_NAME);
+        let root = Path::new("dist");
+        let gen_css_dir = root.join(CSS_DIR_NAME);
+
+        let blog = Blog {
+            posts: vec![],
+            css_path: Some(source_css_file.clone()),
+            header: None,
+            footer: None,
+        };
+
+        let actions = blog.generate_actions(root);
+
+        assert_eq!(actions.len(), 3);
+        assert!(matches!(&actions[0] ,
+           FsAction::DeleteDir {
+            path,
+            not_exists_ok: true,
+            recursive: true
+           } if path == &gen_css_dir
+        ));
+
+        assert!(matches!(&actions[1] ,
+          FsAction::CreateDir {
+            path,
+            ..
+           } if path == &gen_css_dir
+        ));
+
+        assert!(matches!(&actions[2] ,
+           FsAction::Copy{
+            source,
+            dest,
+           } if source == &source_css_file && dest == &gen_css_dir.join(CSS_FILE_NAME)
+        ));
+    }
+
+    #[test]
     fn standalone_file_post_generated() {
         let blog = Blog {
             posts: vec![Post {

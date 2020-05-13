@@ -13,6 +13,8 @@ pub const DEFAULT_CONTENT_PATH: &str = "content";
 pub const HEADER_FILE_NAME: &str = "header.md";
 pub const FOOTER_FILE_NAME: &str = "footer.md";
 pub const FOLDER_POST_NAME: &str = "post.md";
+pub const CSS_FILE_NAME: &str = "style.css";
+pub const CSS_DIR_NAME: &str = "css";
 
 fn main() -> Result<(), Box<dyn Error>> {
     let blog = Blog::from_source_dir(DEFAULT_CONTENT_PATH)?;

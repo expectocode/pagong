@@ -70,8 +70,9 @@ impl Post {
         })
     }
 
-    pub fn push_html(&self, out: &mut String) {
-        let parser = Parser::new(&self.markdown);
+    pub fn write_html(&self, header: &str, footer: &str, out: &mut String) {
+        let input = header.to_string() + "\n" + &self.markdown + "\n" + footer;
+        let parser = Parser::new(&input);
         html::push_html(out, parser);
     }
 }

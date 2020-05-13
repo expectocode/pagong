@@ -1,28 +1,17 @@
-use crate::{Post, FOOTER_FILE_NAME, HEADER_FILE_NAME};
+use crate::{Post, CSS_DIR_NAME, CSS_FILE_NAME, FOOTER_FILE_NAME, HEADER_FILE_NAME};
 
 use std::error::Error;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
-// TODO we don't handle title and other metadata like tags
-// TODO if we want to do this proper we should not put header inside main
-const HTML_START: &str = r#"<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8" />
-</head>
-<body>
-    <main>
-"#;
-
-const HTML_END: &str = r#"    </main>
-</body>
-"#;
+// // TODO we don't handle title and other metadata like tags
+// // TODO if we want to do this proper we should not put header inside main
 
 #[derive(Debug)]
 pub struct Blog {
     pub posts: Vec<Post>,
+    pub css_path: Option<PathBuf>,
     pub header: Option<String>,
     pub footer: Option<String>,
 }
@@ -55,6 +44,7 @@ fn execute_fs_actions(actions: &[FsAction]) -> io::Result<()> {
     // This code is full of checks which are followed by actions, non-atomically.
     // This means that it's full of TOCTOU race conditions. I don't know how to avoid that.
     for action in actions {
+        dbg!(&action);
         match action {
             Copy { source, dest } => {
                 fs::copy(source, dest)?;
@@ -65,11 +55,14 @@ fn execute_fs_actions(actions: &[FsAction]) -> io::Result<()> {
                 recursive,
             } => {
                 let should_fail_if_not_exists = !not_exists_ok;
-                if should_fail_if_not_exists && !path.exists() {
-                    return Err(io::Error::new(
-                        io::ErrorKind::NotFound,
-                        format!("There is nothing to delete at {}", path.to_string_lossy()),
-                    ));
+                if !path.exists() {
+                    if should_fail_if_not_exists {
+                        return Err(io::Error::new(
+                            io::ErrorKind::NotFound,
+                            format!("There is nothing to delete at {}", path.to_string_lossy()),
+                        ));
+                    }
+                    continue;
                 }
                 if *recursive {
                     fs::remove_dir_all(path)?;
@@ -113,11 +106,41 @@ fn execute_fs_actions(actions: &[FsAction]) -> io::Result<()> {
     Ok(())
 }
 
+fn generate_html(post: &Post, header: &str, footer: &str, css: &str) -> String {
+    let mut html = String::new();
+    html.push_str(
+        r#"<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8" />
+"#,
+    );
+    html.push_str(&format!("<title>{}</title>\n", post.title));
+    html.push_str(&format!(r#"<link rel="stylesheet" href="{}">"#, css));
+    html.push('\n');
+    html.push_str(
+        "</head>\n\
+                 <body>\n\
+                 <main>\n",
+    );
+
+    post.write_html(header, footer, &mut html);
+
+    html.push_str(
+        "</main>\n\
+                 </body>\n\
+                 </html>\n ",
+    );
+
+    html
+}
+
 impl Blog {
     pub fn from_source_dir<P: AsRef<Path>>(root: P) -> Result<Self, Box<dyn Error>> {
         let mut posts = vec![];
         let mut header = None;
         let mut footer = None;
+        let mut css_path = None;
 
         for child in fs::read_dir(root)? {
             let child = child?;
@@ -125,10 +148,13 @@ impl Blog {
 
             if let Some(name) = path.file_name() {
                 if name == HEADER_FILE_NAME {
-                    header = Some(fs::read_to_string(path)?);
+                    header = Some(fs::read_to_string(&path)?);
                     continue;
                 } else if name == FOOTER_FILE_NAME {
-                    footer = Some(fs::read_to_string(path)?);
+                    footer = Some(fs::read_to_string(&path)?);
+                    continue;
+                } else if name == CSS_FILE_NAME {
+                    css_path = Some(path.clone());
                     continue;
                 }
             }
@@ -138,6 +164,7 @@ impl Blog {
 
         Ok(Self {
             posts,
+            css_path,
             header,
             footer,
         })
@@ -145,11 +172,31 @@ impl Blog {
 
     pub fn generate<P: AsRef<Path>>(&self, root: P) -> io::Result<()> {
         let actions = self.generate_actions(root);
+        dbg!(&actions);
         execute_fs_actions(&actions)
     }
 
     pub fn generate_actions<P: AsRef<Path>>(&self, root: P) -> Vec<FsAction> {
         let mut actions = vec![];
+
+        if let Some(css_source) = &self.css_path {
+            let css_path = root.as_ref().join(CSS_DIR_NAME);
+
+            actions.push(DeleteDir {
+                path: css_path.clone(),
+                not_exists_ok: true,
+                recursive: true,
+            });
+            actions.push(CreateDir {
+                path: css_path.clone(),
+                exists_ok: false,
+            });
+            actions.push(Copy {
+                source: css_source.clone(),
+                dest: css_path.join(CSS_FILE_NAME),
+            });
+            dbg!(&actions);
+        }
 
         for post in self.posts.iter() {
             // TODO override name with metadata
@@ -167,16 +214,13 @@ impl Blog {
 
             let post_path = post_dir.join("index.html");
 
-            let mut file_content = String::new();
-            file_content.push_str(HTML_START);
-            file_content.push_str(&self.header.as_ref().unwrap_or(&String::new()));
-            post.push_html(&mut file_content);
-            file_content.push_str(&self.footer.as_ref().unwrap_or(&String::new()));
-            file_content.push_str(HTML_END);
+            let css = format!("../css/{}", CSS_FILE_NAME);
+            let header = self.header.as_ref().map(|s| s.as_str()).unwrap_or("");
+            let footer = self.footer.as_ref().map(|s| s.as_str()).unwrap_or("");
 
             actions.push(WriteFile {
                 path: post_path,
-                content: file_content,
+                content: generate_html(post, header, footer, &css),
             });
 
             for asset in post.assets.iter() {
@@ -211,6 +255,7 @@ mod tests {
                 created: Local::now(),
                 assets: vec![],
             }],
+            css_path: None,
             header: None,
             footer: None,
         };

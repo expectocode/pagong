@@ -1,9 +1,5 @@
 use crate::{Post, FOOTER_FILE_NAME, HEADER_FILE_NAME};
 
-use std::error::Error;
-use std::fs;
-use std::path::{Path, PathBuf};
-
 // TODO we don't handle title and other metadata like tags
 // TODO if we want to do this proper we should not put header inside main
 const HTML_START: &str = r#"<!DOCTYPE html>

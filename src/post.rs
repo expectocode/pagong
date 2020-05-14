@@ -213,7 +213,7 @@ impl Post {
                 }
             }
             Event::End(tag) => {
-                match tag {
+                match &tag {
                     Tag::Paragraph => {
                         out.push_str("</p>");
                     }
@@ -263,7 +263,14 @@ impl Post {
                         out.push_str("\">");
                     }
                 }
-                out.push('\n');
+                match tag {
+                    Tag::Image(_, _, _) => {
+                        // doesn't get newline (self-closing)
+                    }
+                    _ => {
+                        out.push('\n');
+                    }
+                }
             }
             Event::Text(text) => {
                 escape_html(&text, out);

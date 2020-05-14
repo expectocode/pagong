@@ -1,8 +1,8 @@
 # Tortuga
 
-Write markdown, get a static site*
+![tortuga's logo](logo.svg) Write markdown, get a static site*
 
-*not yet implemented
+_*not yet implemented_
 
 ### License
 

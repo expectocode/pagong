@@ -2,6 +2,7 @@ use crate::FOLDER_POST_NAME;
 
 use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag};
 use std::collections::HashMap;
+use std::collections::VecDeque;
 use std::error::Error;
 use std::ffi::OsStr;
 use std::fs;
@@ -74,10 +75,14 @@ impl Post {
 
         // Parse meta overrides
         let mut meta = HashMap::new();
-        let mut lines = content.split('\n');
-        if let Some("```meta") = lines.next() {
+        let mut lines: VecDeque<&str> = content.split('\n').collect();
+
+        if lines[0] == "```meta" {
+            lines.pop_front();
             loop {
-                let line = lines.next().expect("Unexpected EOF while parsing meta");
+                let line = lines
+                    .pop_front()
+                    .expect("Unexpected EOF while parsing meta");
                 if line == "```" {
                     break;
                 }
@@ -94,8 +99,16 @@ impl Post {
 
         // Store everything after the meta info on the Post. Re-join with newlines.
         let content = {
-            let lines: Vec<String> = lines.map(str::to_string).collect();
-            lines.join("\n")
+            let mut result = String::new();
+            let mut iter = lines.into_iter();
+            if let Some(line) = iter.next() {
+                result.push_str(line);
+            }
+            for line in iter {
+                result.push('\n');
+                result.push_str(line);
+            }
+            result
         };
 
         Ok(Post {
@@ -260,5 +273,13 @@ impl Post {
                 // TODO ???
             }
         });
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn ensure_content_intact() {
+        todo!("ensure the first line of a markdown source is not eaten");
     }
 }

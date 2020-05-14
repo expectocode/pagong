@@ -180,19 +180,35 @@ impl Post {
                     Tag::Strikethrough => {
                         out.push_str("<del>");
                     }
-                    Tag::Link(_ty, dest, _title) => {
-                        // TODO use title and type
-                        // TODO quote destination
+                    Tag::Link(_ty, dest, title) => {
+                        // TODO use type?
+                        // TODO quote destination and title
                         out.push_str("<a href=\"");
                         out.push_str(&dest);
-                        out.push_str("\">");
+                        out.push('"');
+
+                        if !title.is_empty() {
+                            out.push_str(" title=\"");
+                            out.push_str(&title);
+                            out.push('"');
+                        }
+
+                        out.push('>');
                     }
-                    Tag::Image(_ty, dest, _title) => {
-                        // TODO use title and type
-                        // TODO quote destination
+                    Tag::Image(_ty, dest, title) => {
+                        // TODO use type?
+                        // TODO quote destination and title
                         out.push_str("<img href=\"");
                         out.push_str(&dest);
-                        out.push_str("\">");
+                        out.push('"');
+
+                        if !title.is_empty() {
+                            out.push_str(" title=\"");
+                            out.push_str(&title);
+                            out.push('"');
+                        }
+
+                        out.push('>');
                     }
                 }
             }

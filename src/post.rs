@@ -263,6 +263,7 @@ impl Post {
                         out.push_str("\">");
                     }
                 }
+                out.push('\n');
             }
             Event::Text(text) => {
                 escape_html(&text, out);

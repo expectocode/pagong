@@ -208,7 +208,7 @@ impl Post {
                             out.push('"');
                         }
 
-                        out.push('>');
+                        out.push_str(" alt=\"");
                     }
                 }
             }
@@ -260,7 +260,7 @@ impl Post {
                         out.push_str("</a>");
                     }
                     Tag::Image(_ty, _dest, _title) => {
-                        // self-closed
+                        out.push_str("\">");
                     }
                 }
             }

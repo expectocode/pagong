@@ -1,6 +1,7 @@
+use crate::html;
 use crate::FOLDER_POST_NAME;
 
-use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag};
+use pulldown_cmark::{Event, Parser, Tag};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::error::Error;
@@ -20,15 +21,6 @@ pub struct Post {
     pub modified: DateTime<Local>,
     pub created: DateTime<Local>,
     pub assets: Vec<PathBuf>,
-}
-
-fn escape_html(text: &str, out: &mut String) {
-    text.chars().for_each(|c| match c {
-        '<' => out.push_str("&lt;"),
-        '>' => out.push_str("&gt;"),
-        '&' => out.push_str("&amp;"),
-        c => out.push(c),
-    })
 }
 
 impl Post {
@@ -124,179 +116,8 @@ impl Post {
 
     pub fn write_html(&self, header: &str, footer: &str, out: &mut String) {
         let input = header.to_string() + "\n" + &self.markdown + "\n" + footer;
-        Parser::new(&input).for_each(|event| match event {
-            Event::Start(tag) => {
-                match tag {
-                    Tag::Paragraph => {
-                        out.push_str("<p>");
-                    }
-                    Tag::Heading(level) => {
-                        out.push_str(&format!("<h{}>", level));
-                    }
-                    Tag::BlockQuote => {
-                        out.push_str("<blockquote>");
-                    }
-                    Tag::CodeBlock(kind) => {
-                        out.push_str("<pre><code");
-                        match kind {
-                            CodeBlockKind::Fenced(info) => {
-                                out.push_str(" class=\"language-");
-                                out.push_str(&info);
-                                out.push('"');
-                            }
-                            CodeBlockKind::Indented => {}
-                        };
-                        out.push('>');
-                    }
-                    Tag::List(_first_item_no) => {
-                        // TODO use first_item_no
-                        out.push_str("<ol>");
-                    }
-                    Tag::Item => {
-                        out.push_str("<li>");
-                    }
-                    Tag::FootnoteDefinition(_label) => {
-                        // TODO ???
-                    }
-                    Tag::Table(_column_align) => {
-                        // TODO use column_align
-                        out.push_str("<table>");
-                    }
-                    Tag::TableHead => {
-                        out.push_str("<thead>");
-                    }
-                    Tag::TableRow => {
-                        out.push_str("<tr>");
-                    }
-                    Tag::TableCell => {
-                        out.push_str("<td>");
-                    }
-                    Tag::Emphasis => {
-                        out.push_str("<em>");
-                    }
-                    Tag::Strong => {
-                        out.push_str("<strong>");
-                    }
-                    Tag::Strikethrough => {
-                        out.push_str("<del>");
-                    }
-                    Tag::Link(_ty, dest, title) => {
-                        // TODO use type?
-                        // TODO quote destination and title
-                        out.push_str("<a href=\"");
-                        out.push_str(&dest);
-                        out.push('"');
-
-                        if !title.is_empty() {
-                            out.push_str(" title=\"");
-                            out.push_str(&title);
-                            out.push('"');
-                        }
-
-                        out.push('>');
-                    }
-                    Tag::Image(_ty, dest, title) => {
-                        // TODO use type?
-                        // TODO quote destination and title
-                        out.push_str("<img src=\"");
-                        out.push_str(&dest);
-                        out.push('"');
-
-                        if !title.is_empty() {
-                            out.push_str(" title=\"");
-                            out.push_str(&title);
-                            out.push('"');
-                        }
-
-                        out.push_str(" alt=\"");
-                    }
-                }
-            }
-            Event::End(tag) => {
-                match &tag {
-                    Tag::Paragraph => {
-                        out.push_str("</p>");
-                    }
-                    Tag::Heading(level) => {
-                        out.push_str(&format!("</h{}>", level));
-                    }
-                    Tag::BlockQuote => {
-                        out.push_str("</blockquote>");
-                    }
-                    Tag::CodeBlock(_kind) => {
-                        out.push_str("</code></pre>");
-                    }
-                    Tag::List(_first_item_no) => {
-                        out.push_str("</ol>");
-                    }
-                    Tag::Item => {
-                        out.push_str("</li>");
-                    }
-                    Tag::FootnoteDefinition(_label) => {
-                        // TODO ???
-                    }
-                    Tag::Table(_column_align) => {
-                        out.push_str("</table>");
-                    }
-                    Tag::TableHead => {
-                        out.push_str("</thead>");
-                    }
-                    Tag::TableRow => {
-                        out.push_str("</tr>");
-                    }
-                    Tag::TableCell => {
-                        out.push_str("</td>");
-                    }
-                    Tag::Emphasis => {
-                        out.push_str("</em>");
-                    }
-                    Tag::Strong => {
-                        out.push_str("</strong>");
-                    }
-                    Tag::Strikethrough => {
-                        out.push_str("</del>");
-                    }
-                    Tag::Link(_ty, _dest, _title) => {
-                        out.push_str("</a>");
-                    }
-                    Tag::Image(_ty, _dest, _title) => {
-                        out.push_str("\">");
-                    }
-                }
-                match tag {
-                    Tag::Image(_, _, _) => {
-                        // doesn't get newline (self-closing)
-                    }
-                    _ => {
-                        out.push('\n');
-                    }
-                }
-            }
-            Event::Text(text) => {
-                escape_html(&text, out);
-            }
-            Event::Code(text) => {
-                escape_html(&text, out);
-            }
-            Event::Html(text) => {
-                out.push_str(&text);
-            }
-            Event::FootnoteReference(_text) => {
-                // TODO ???
-            }
-            Event::SoftBreak => {
-                // TODO ???
-            }
-            Event::HardBreak => {
-                // TODO ???
-            }
-            Event::Rule => {
-                out.push_str("<hr>");
-            }
-            Event::TaskListMarker(_checked) => {
-                // TODO ???
-            }
-        });
+        let parser = Parser::new(&input); // TODO options
+        html::push_html(out, parser);
     }
 }
 

@@ -2,6 +2,9 @@ mod blog;
 mod fs_action;
 mod post;
 
+mod escape;
+mod html;
+
 use std::error::Error;
 use std::fs;
 use std::io;

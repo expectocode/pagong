@@ -198,7 +198,7 @@ impl Post {
                     Tag::Image(_ty, dest, title) => {
                         // TODO use type?
                         // TODO quote destination and title
-                        out.push_str("<img href=\"");
+                        out.push_str("<img src=\"");
                         out.push_str(&dest);
                         out.push('"');
 

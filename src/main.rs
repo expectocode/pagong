@@ -43,5 +43,5 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     blog.generate(output_dir)?;
 
-    todo!()
+    Ok(())
 }

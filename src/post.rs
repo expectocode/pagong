@@ -125,6 +125,6 @@ impl Post {
 mod tests {
     #[test]
     fn ensure_content_intact() {
-        todo!("ensure the first line of a markdown source is not eaten");
+        // TODO ensure the first line of a markdown source is not eaten"
     }
 }

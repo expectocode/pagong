@@ -1,6 +1,6 @@
-# Tortuga
+# Tortuga ![tortuga's logo](logo.svg)
 
-![tortuga's logo](logo.svg) Write markdown, get a static site*
+Write markdown, get a static site*
 
 _*not yet implemented_
 

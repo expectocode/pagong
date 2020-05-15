@@ -5,7 +5,7 @@ use pulldown_cmark::{Event, Parser, Tag};
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::error::Error;
-use std::ffi::OsStr;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -14,9 +14,10 @@ use chrono::DateTime;
 
 #[derive(Debug)]
 pub struct Post {
-    pub source: PathBuf,
     pub markdown: String,
     pub meta: HashMap<String, String>,
+    /// The name that will become part of the post's URL
+    pub file_name: OsString,
     pub title: String,
     pub modified: DateTime<Local>,
     pub created: DateTime<Local>,
@@ -53,7 +54,10 @@ impl Post {
         }
 
         Ok(Self::from_sources(
-            path.as_ref().to_path_buf(),
+            path.as_ref()
+                .file_stem()
+                .expect("Post file must have stem")
+                .into(),
             content,
             assets,
             modified,
@@ -63,7 +67,7 @@ impl Post {
 
     /// Partially parses markdown to apply meta overrides
     fn from_sources(
-        source: PathBuf,
+        file_name: OsString,
         markdown: String,
         assets: Vec<PathBuf>,
         modified: DateTime<Local>,
@@ -121,7 +125,7 @@ impl Post {
         };
 
         Post {
-            source,
+            file_name,
             markdown: content,
             meta,
             title: title.unwrap_or_else(|| "(no title)".to_string()),

@@ -109,8 +109,8 @@ impl Blog {
 
         for post in self.posts.iter() {
             // TODO override name with metadata
-            let post_file_stem = post.source.file_stem().expect("Post must have filename");
-            let post_dir = root.as_ref().join(post_file_stem);
+            let post_file_name = &post.file_name;
+            let post_dir = root.as_ref().join(post_file_name);
             actions.push(FsAction::DeleteDir {
                 path: post_dir.clone(),
                 not_exists_ok: true,
@@ -197,7 +197,7 @@ mod tests {
     fn standalone_file_post_generated() {
         let blog = Blog {
             posts: vec![Post {
-                source: "/path/to/content/test_post.md".into(),
+                file_name: "test_post".into(),
                 markdown: "A test post".into(),
                 meta: HashMap::new(),
                 title: "A test post title".into(),

@@ -25,7 +25,7 @@ pub struct Post {
 
 impl Post {
     /// Construct a post from a standalone title.md or a title/ directory
-    /// containing a post.md and optional assets.
+    /// containing a post.md and optional assets. Performs I/O.
     pub fn from_source_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
         let post_path = if path.as_ref().is_file() {
             path.as_ref().to_path_buf()
@@ -52,9 +52,26 @@ impl Post {
             }
         }
 
+        Ok(Self::from_sources(
+            path.as_ref().to_path_buf(),
+            content,
+            assets,
+            modified,
+            created,
+        ))
+    }
+
+    /// Partially parses markdown to apply meta overrides
+    fn from_sources(
+        source: PathBuf,
+        markdown: String,
+        assets: Vec<PathBuf>,
+        modified: DateTime<Local>,
+        created: DateTime<Local>,
+    ) -> Self {
         let mut title = None;
         let mut wait_title = false;
-        for event in Parser::new(&content) {
+        for event in Parser::new(&markdown) {
             match event {
                 Event::Start(Tag::Heading(1)) => wait_title = true,
                 Event::Text(string) if wait_title => {
@@ -67,7 +84,7 @@ impl Post {
 
         // Parse meta overrides
         let mut meta = HashMap::new();
-        let mut lines: VecDeque<&str> = content.split('\n').collect();
+        let mut lines: VecDeque<&str> = markdown.split('\n').collect();
 
         if lines[0] == "```meta" {
             lines.pop_front();
@@ -103,15 +120,15 @@ impl Post {
             result
         };
 
-        Ok(Post {
-            source: path.as_ref().to_path_buf(),
+        Post {
+            source,
             markdown: content,
             meta,
             title: title.unwrap_or_else(|| "(no title)".to_string()),
             modified,
             created,
             assets,
-        })
+        }
     }
 
     pub fn write_html(&self, header: &str, footer: &str, out: &mut String) {
@@ -123,8 +140,24 @@ impl Post {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
+    use chrono::offset::Local;
+
+    /// Check that the title is extracted from the markdown, and that the content
+    /// remains intact.
     #[test]
-    fn ensure_content_intact() {
-        // TODO ensure the first line of a markdown source is not eaten"
+    fn markdown_title_extracted() {
+        let source = Path::new("/path/to/content/test.md").into();
+        let markdown = "# My header\n\
+        My text goes here...\n\
+        More text after that.";
+        let created = Local::now();
+        let modified = created.clone();
+        let assets = vec![];
+
+        let post = Post::from_sources(source, markdown.into(), assets, modified, created);
+
+        assert_eq!(post.markdown, markdown);
+        assert_eq!(post.title, "My header");
     }
 }

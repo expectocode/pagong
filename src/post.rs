@@ -10,7 +10,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use chrono::offset::Local;
-use chrono::DateTime;
+use chrono::{Date, NaiveDate, TimeZone};
 
 #[derive(Debug)]
 pub struct Post {
@@ -19,8 +19,8 @@ pub struct Post {
     /// The name that will become part of the post's URL
     pub path: OsString,
     pub title: String,
-    pub modified: DateTime<Local>,
-    pub created: DateTime<Local>,
+    pub modified: Date<Local>,
+    pub created: Date<Local>,
     pub assets: Vec<PathBuf>,
 }
 
@@ -39,8 +39,11 @@ impl Post {
         let content = fs::read_to_string(&post_path)?;
 
         let post_metadata = post_path.metadata()?;
-        let created = post_metadata.created()?.into();
-        let modified = post_metadata.modified()?.into();
+        let created = post_metadata.created()?;
+        let modified = post_metadata.modified()?;
+
+        let created = chrono::DateTime::from(created).date();
+        let modified = chrono::DateTime::from(modified).date();
 
         let mut assets = vec![];
         if path.as_ref().is_dir() {
@@ -70,11 +73,12 @@ impl Post {
         path: OsString,
         markdown: String,
         assets: Vec<PathBuf>,
-        modified: DateTime<Local>,
-        created: DateTime<Local>,
+        modified: Date<Local>,
+        created: Date<Local>,
     ) -> Self {
         let mut title = None;
         let mut wait_title = false;
+
         for event in Parser::new(&markdown) {
             match event {
                 Event::Start(Tag::Heading(1)) => wait_title = true,
@@ -87,7 +91,7 @@ impl Post {
         }
 
         // Parse meta overrides
-        let mut meta = HashMap::new();
+        let mut meta: HashMap<String, String> = HashMap::new();
         let mut lines: VecDeque<&str> = markdown.split('\n').collect();
 
         if lines[0] == "```meta" {
@@ -106,9 +110,7 @@ impl Post {
                     .expect(&format!("Meta line \"{}\" should contain a colon", line));
                 meta.insert(key.into(), value.into());
             }
-            dbg!(&meta);
         }
-        // TODO actually parse the meta keys & values
 
         // Store everything after the meta info on the Post. Re-join with newlines.
         let content = {
@@ -123,6 +125,32 @@ impl Post {
             }
             result
         };
+
+        let mut path = path;
+        let mut created = created;
+        let mut modified = modified;
+
+        for (key, new_value) in meta.iter() {
+            match key.to_lowercase().as_ref() {
+                "title" => title = Some(new_value.trim().to_string()),
+                "path" => path = new_value.trim().into(),
+                "created" => {
+                    created = parse_date(new_value)
+                        .expect(&format!("Invalid `created` override \"{}\"", new_value));
+                }
+                "modified" => {
+                    modified = parse_date(new_value)
+                        .expect(&format!("Invalid `modified` override \"{}\"", new_value));
+                }
+                _ => {
+                    eprintln!(
+                        "Unexpected meta override key \"{}\" in post {}, ignoring.",
+                        key,
+                        path.to_string_lossy()
+                    );
+                }
+            }
+        }
 
         Post {
             path,
@@ -142,6 +170,15 @@ impl Post {
     }
 }
 
+/// Parse a string of the form YYYY-MM-DD into a "local" Date
+fn parse_date(date: &str) -> Option<chrono::Date<Local>> {
+    let naive = NaiveDate::parse_from_str(date, "%Y-%m-%d");
+    naive
+        .ok()
+        .map(|date| TimeZone::from_local_date(&Local, &date).latest())
+        .expect("Override date should be valid YYYY-MM-DD")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -155,7 +192,7 @@ mod tests {
         let markdown = "# My header\n\
         My text goes here...\n\
         More text after that.";
-        let created = Local::now();
+        let created = Local::today();
         let modified = created.clone();
         let assets = vec![];
 
@@ -163,5 +200,38 @@ mod tests {
 
         assert_eq!(post.markdown, markdown);
         assert_eq!(post.title, "My header");
+    }
+
+    /// Check that the meta block is extracted from the Post's markdown, and
+    /// that properties can be overridden by it.
+    #[test]
+    fn meta_block_applied() {
+        let path: OsString = "test_post".into();
+        let content = "```meta
+title: Overridden Title
+path: custom_path
+modified: 2020-05-05
+```
+# My blog post with a long title to be overridden
+
+Some words.";
+
+        let created = TimeZone::ymd(&Local, 1999, 12, 01);
+        let modified = created.clone();
+        let assets = vec![];
+
+        let post = Post::from_sources(path, content.into(), assets, modified, created);
+
+        assert_eq!(
+            post.markdown,
+            concat!(
+                "# My blog post with a long title to be overridden\n\n",
+                "Some words."
+            )
+        );
+        assert_eq!(post.title, "Overridden Title");
+        assert_eq!(post.path, "custom_path");
+        assert_eq!(post.modified, Local.ymd(2020, 05, 05));
+        assert_eq!(post.created, created);
     }
 }

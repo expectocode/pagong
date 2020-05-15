@@ -17,7 +17,7 @@ pub struct Post {
     pub markdown: String,
     pub meta: HashMap<String, String>,
     /// The name that will become part of the post's URL
-    pub file_name: OsString,
+    pub path: OsString,
     pub title: String,
     pub modified: DateTime<Local>,
     pub created: DateTime<Local>,
@@ -67,7 +67,7 @@ impl Post {
 
     /// Partially parses markdown to apply meta overrides
     fn from_sources(
-        file_name: OsString,
+        path: OsString,
         markdown: String,
         assets: Vec<PathBuf>,
         modified: DateTime<Local>,
@@ -125,7 +125,7 @@ impl Post {
         };
 
         Post {
-            file_name,
+            path,
             markdown: content,
             meta,
             title: title.unwrap_or_else(|| "(no title)".to_string()),
@@ -151,7 +151,7 @@ mod tests {
     /// remains intact.
     #[test]
     fn markdown_title_extracted() {
-        let source = Path::new("/path/to/content/test.md").into();
+        let path = "test".into();
         let markdown = "# My header\n\
         My text goes here...\n\
         More text after that.";
@@ -159,7 +159,7 @@ mod tests {
         let modified = created.clone();
         let assets = vec![];
 
-        let post = Post::from_sources(source, markdown.into(), assets, modified, created);
+        let post = Post::from_sources(path, markdown.into(), assets, modified, created);
 
         assert_eq!(post.markdown, markdown);
         assert_eq!(post.title, "My header");

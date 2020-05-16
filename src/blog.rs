@@ -123,7 +123,7 @@ impl Blog {
 
             let post_path = post_dir.join("index.html");
 
-            let css = format!("../css/{}", CSS_FILE_NAME);
+            let css = format!("../{}/{}", CSS_DIR_NAME, CSS_FILE_NAME);
             let header = self.header.as_ref().map(|s| s.as_str()).unwrap_or("");
             let footer = self.footer.as_ref().map(|s| s.as_str()).unwrap_or("");
 

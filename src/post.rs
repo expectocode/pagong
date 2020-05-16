@@ -169,7 +169,32 @@ impl Post {
     }
 
     pub fn write_html(&self, header: &str, footer: &str, out: &mut String) {
-        let input = header.to_string() + "\n" + &self.markdown + "\n" + footer;
+        let date_format = "%Y-%m-%d";
+        let date_divs = if self.modified == self.created {
+            format!(
+                "<div class=\"date-created-modified\">{}</div>",
+                self.created.format(date_format)
+            )
+        } else {
+            format!(
+                "<div class=\"date-created-modified\">Created {}<br>
+Modified {}</div>",
+                self.created.format(date_format),
+                self.modified.format(date_format)
+            )
+        };
+
+        // Insert date after first element (usually the title)
+        let mut parser = Parser::new(&self.markdown).into_offset_iter(); // TODO options
+        let (_, first_range) = parser.next().expect("Post must have at least one element");
+        let main = self.markdown[first_range.clone()].to_string()
+            + "\n"
+            + &date_divs
+            + "\n"
+            + &self.markdown[first_range.end..];
+
+        let input = header.to_string() + "\n" + &main + "\n" + footer;
+
         let parser = Parser::new(&input); // TODO options
         html::push_html(out, parser);
     }

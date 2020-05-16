@@ -329,12 +329,6 @@ where
                 self.write("\">")
             }
             Tag::Image(_link_type, dest, title) => {
-                let captioned = !title.is_empty();
-
-                if captioned {
-                    self.write("</p>\n")?;
-                    self.write("<div class=\"image-container\">\n")?;
-                }
                 self.write("<img src=\"")?;
                 escape_href(&mut self.writer, &dest)?;
                 self.write("\" alt=\"")?;
@@ -343,15 +337,7 @@ where
                     self.write("\" title=\"")?;
                     escape_html(&mut self.writer, &title)?;
                 }
-                self.write("\" />")?;
-                if captioned {
-                    self.write("\n<div class=\"image-caption\">")?;
-                    escape_html(&mut self.writer, &title)?;
-                    self.write("</div>\n")?;
-                    self.write("</div>\n")?;
-                    self.write("<p>\n")?;
-                }
-                Ok(())
+                self.write("\" />")
             }
             Tag::FootnoteDefinition(name) => {
                 if self.end_newline {

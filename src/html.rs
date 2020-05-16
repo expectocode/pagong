@@ -573,3 +573,29 @@ where
 {
     HtmlWriter::new(iter, s).run().unwrap();
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use pulldown_cmark::Parser;
+
+    #[test]
+    fn standalone_images_are_not_paragraphs() {
+        let input = "Some text above
+
+![image alt](image_url \"Image Title\")
+
+Some text below.";
+
+        let parser = Parser::new(input);
+
+        let filtered_events: Vec<_> = ImageParagraphFilter::new(parser).collect();
+
+        let image_paragraph = &filtered_events[3..(filtered_events.len() - 3)];
+
+        assert!(matches!(
+            image_paragraph,
+            [(Start(Tag::Image(..)), true), (Text(_), false), (End(Tag::Image(..)), false)]
+        ));
+    }
+}

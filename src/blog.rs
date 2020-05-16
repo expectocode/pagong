@@ -152,7 +152,6 @@ mod tests {
     // executor so that we can test for results rather than individual actions.
     use super::*;
     use chrono::offset::Local;
-    use std::collections::HashMap;
 
     #[test]
     fn css_file_copied() {
@@ -199,7 +198,6 @@ mod tests {
             posts: vec![Post {
                 path: "test_post".into(),
                 markdown: "A test post".into(),
-                meta: HashMap::new(),
                 title: "A test post title".into(),
                 modified: Local::today(),
                 created: Local::today(),

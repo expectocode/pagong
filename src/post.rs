@@ -15,13 +15,46 @@ use chrono::{Date, NaiveDate, TimeZone};
 #[derive(Debug)]
 pub struct Post {
     pub markdown: String,
-    pub meta: HashMap<String, String>,
     /// The name that will become part of the post's URL
     pub path: OsString,
     pub title: String,
     pub modified: Date<Local>,
     pub created: Date<Local>,
     pub assets: Vec<PathBuf>,
+}
+
+#[derive(Debug)]
+struct Metadata {
+    title: Option<String>,
+    path: OsString,
+    created: Date<Local>,
+    modified: Date<Local>,
+}
+
+impl Metadata {
+    fn update_from_kvp(&mut self, kvp: &HashMap<String, String>) {
+        for (key, value) in kvp.iter() {
+            match key.to_lowercase().as_ref() {
+                "title" => self.title = Some(value.trim().to_string()),
+                "path" => self.path = value.trim().into(),
+                "created" => {
+                    self.created = parse_date(value)
+                        .expect(&format!("Invalid `created` override \"{}\"", value));
+                }
+                "modified" => {
+                    self.modified = parse_date(value)
+                        .expect(&format!("Invalid `modified` override \"{}\"", value));
+                }
+                _ => {
+                    eprintln!(
+                        "Unexpected meta override key \"{}\" in post {}, ignoring.",
+                        key,
+                        self.path.to_string_lossy()
+                    );
+                }
+            }
+        }
+    }
 }
 
 impl Post {
@@ -57,33 +90,29 @@ impl Post {
         }
 
         Ok(Self::from_sources(
-            path.as_ref()
-                .file_stem()
-                .expect("Post file must have stem")
-                .into(),
             content,
             assets,
-            modified,
-            created,
+            Metadata {
+                title: None,
+                path: path
+                    .as_ref()
+                    .file_stem()
+                    .expect("Post file must have stem")
+                    .into(),
+                modified,
+                created,
+            },
         ))
     }
 
     /// Partially parses markdown to apply meta overrides
-    fn from_sources(
-        path: OsString,
-        markdown: String,
-        assets: Vec<PathBuf>,
-        modified: Date<Local>,
-        created: Date<Local>,
-    ) -> Self {
-        let mut title = None;
+    fn from_sources(markdown: String, assets: Vec<PathBuf>, mut meta: Metadata) -> Self {
         let mut wait_title = false;
-
         for event in Parser::new(&markdown) {
             match event {
                 Event::Start(Tag::Heading(1)) => wait_title = true,
                 Event::Text(string) if wait_title => {
-                    title = Some(string.to_string());
+                    meta.title = Some(string.to_string());
                     break;
                 }
                 _ => {}
@@ -91,7 +120,7 @@ impl Post {
         }
 
         // Parse meta overrides
-        let mut meta: HashMap<String, String> = HashMap::new();
+        let mut meta_kvp: HashMap<String, String> = HashMap::new();
         let mut lines: VecDeque<&str> = markdown.split('\n').collect();
 
         if lines[0] == "```meta" {
@@ -108,7 +137,7 @@ impl Post {
                 let value = kv
                     .next()
                     .expect(&format!("Meta line \"{}\" should contain a colon", line));
-                meta.insert(key.into(), value.into());
+                meta_kvp.insert(key.into(), value.into());
             }
         }
 
@@ -126,39 +155,14 @@ impl Post {
             result
         };
 
-        let mut path = path;
-        let mut created = created;
-        let mut modified = modified;
-
-        for (key, new_value) in meta.iter() {
-            match key.to_lowercase().as_ref() {
-                "title" => title = Some(new_value.trim().to_string()),
-                "path" => path = new_value.trim().into(),
-                "created" => {
-                    created = parse_date(new_value)
-                        .expect(&format!("Invalid `created` override \"{}\"", new_value));
-                }
-                "modified" => {
-                    modified = parse_date(new_value)
-                        .expect(&format!("Invalid `modified` override \"{}\"", new_value));
-                }
-                _ => {
-                    eprintln!(
-                        "Unexpected meta override key \"{}\" in post {}, ignoring.",
-                        key,
-                        path.to_string_lossy()
-                    );
-                }
-            }
-        }
+        meta.update_from_kvp(&meta_kvp);
 
         Post {
-            path,
             markdown: content,
-            meta,
-            title: title.unwrap_or_else(|| "(no title)".to_string()),
-            modified,
-            created,
+            path: meta.path,
+            title: meta.title.unwrap_or_else(|| "(no title)".to_string()),
+            modified: meta.modified,
+            created: meta.created,
             assets,
         }
     }
@@ -188,15 +192,18 @@ mod tests {
     /// remains intact.
     #[test]
     fn markdown_title_extracted() {
-        let path = "test".into();
         let markdown = "# My header\n\
         My text goes here...\n\
         More text after that.";
-        let created = Local::today();
-        let modified = created.clone();
         let assets = vec![];
+        let meta = Metadata {
+            title: None,
+            path: "test".into(),
+            created: Local::today(),
+            modified: Local::today(),
+        };
 
-        let post = Post::from_sources(path, markdown.into(), assets, modified, created);
+        let post = Post::from_sources(markdown.into(), assets, meta);
 
         assert_eq!(post.markdown, markdown);
         assert_eq!(post.title, "My header");
@@ -206,7 +213,6 @@ mod tests {
     /// that properties can be overridden by it.
     #[test]
     fn meta_block_applied() {
-        let path: OsString = "test_post".into();
         let content = "```meta
 title: Overridden Title
 path: custom_path
@@ -215,12 +221,16 @@ modified: 2020-05-05
 # My blog post with a long title to be overridden
 
 Some words.";
-
-        let created = TimeZone::ymd(&Local, 1999, 12, 01);
-        let modified = created.clone();
         let assets = vec![];
+        let date = TimeZone::ymd(&Local, 1999, 12, 01);
+        let meta = Metadata {
+            title: None,
+            path: "test_post".into(),
+            created: date.clone(),
+            modified: date.clone(),
+        };
 
-        let post = Post::from_sources(path, content.into(), assets, modified, created);
+        let post = Post::from_sources(content.into(), assets, meta);
 
         assert_eq!(
             post.markdown,
@@ -231,7 +241,9 @@ Some words.";
         );
         assert_eq!(post.title, "Overridden Title");
         assert_eq!(post.path, "custom_path");
-        assert_eq!(post.modified, Local.ymd(2020, 05, 05));
-        assert_eq!(post.created, created);
+        assert_eq!(post.created, date.clone());
+
+        let date = Local.ymd(2020, 05, 05);
+        assert_eq!(post.modified, date.clone());
     }
 }

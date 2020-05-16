@@ -99,6 +99,9 @@ struct HtmlWriter<'a, I, W> {
     /// Writer to write to.
     writer: W,
 
+    /// Have we written out the post's title yet?
+    title_written: bool,
+
     /// Whether or not the last write wrote a newline.
     end_newline: bool,
 
@@ -117,6 +120,7 @@ where
         Self {
             iter,
             writer,
+            title_written: false,
             end_newline: true,
             table_state: TableState::Head,
             table_alignments: vec![],
@@ -209,10 +213,15 @@ where
             Tag::Heading(level) => {
                 if self.end_newline {
                     self.end_newline = false;
-                    write!(&mut self.writer, "<h{}>", level)
                 } else {
-                    write!(&mut self.writer, "\n<h{}>", level)
+                    self.writer.write_str("\n")?;
                 }
+                write!(&mut self.writer, "<h{}", level)?;
+                if !self.title_written {
+                    self.title_written = true;
+                    self.writer.write_str(" class=\"title\"")?;
+                }
+                self.writer.write_str(">")
             }
             Tag::Table(alignments) => {
                 self.table_alignments = alignments;

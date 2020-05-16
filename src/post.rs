@@ -32,54 +32,42 @@ struct Metadata {
 
 impl Metadata {
     fn update_from_contents(&mut self, contents: &str) -> Option<Range<usize>> {
-        #[derive(Debug)]
-        enum State {
-            Idle,
-            WaitTitle,
-            WaitMeta(usize),
-            WaitEndMeta(usize),
-        }
-
+        let mut parser = Parser::new(contents).into_offset_iter();
         let mut remove_range = None;
 
-        Parser::new(contents)
-            .into_offset_iter()
-            .fold(State::Idle, |state, (event, range)| match event {
-                Event::Start(Tag::Heading(1)) => State::WaitTitle,
-                Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang)))
-                    if lang.as_ref() == "meta" =>
-                {
-                    State::WaitMeta(range.start)
+        let first = parser.next();
+        if let Some((Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))), start_range)) =
+            first
+        {
+            if lang.as_ref() == "meta" {
+                remove_range = Some(start_range.clone());
+                self.update_from_meta_contents(&contents[start_range]);
+            }
+        }
+
+        if self.title.is_none() {
+            // Extract first header as title
+            let mut wait_title = false;
+            for event in Parser::new(&contents) {
+                match event {
+                    Event::Start(Tag::Heading(1)) => wait_title = true,
+                    Event::Text(s) if wait_title => {
+                        self.title = Some(s.to_string());
+                        break;
+                    }
+                    _ => {}
                 }
-                Event::Text(string) => match state {
-                    State::WaitTitle if self.title.is_none() => {
-                        self.title = Some(string.to_string());
-                        State::Idle
-                    }
-                    State::WaitMeta(range_start) => {
-                        self.update_from_meta_contents(&string);
-                        State::WaitEndMeta(range_start)
-                    }
-                    _ => State::Idle,
-                },
-                Event::End(Tag::CodeBlock(CodeBlockKind::Fenced(lang)))
-                    if lang.as_ref() == "meta" =>
-                {
-                    match state {
-                        State::WaitEndMeta(range_start) => {
-                            remove_range = Some(range_start..range.end);
-                            State::Idle
-                        }
-                        _ => panic!(format!("Invalid state reached {:?}", state)),
-                    }
-                }
-                _ => state,
-            });
+            }
+        }
 
         remove_range
     }
 
     fn update_from_meta_contents(&mut self, contents: &str) {
+        let contents = contents
+            .trim_start_matches("```meta")
+            .trim_end_matches("```");
+
         contents
             .split('\n')
             .filter(|line| !line.is_empty())
@@ -167,6 +155,9 @@ impl Post {
             markdown.replace_range(remove_range, "");
         }
 
+        // Remove leading whitespace
+        markdown = markdown.trim_start().into();
+
         Post {
             markdown,
             path: meta.path,
@@ -245,7 +236,7 @@ Some words.";
         assert_eq!(
             post.markdown,
             concat!(
-                "\n# My blog post with a long title to be overridden\n\n",
+                "# My blog post with a long title to be overridden\n\n",
                 "Some words."
             )
         );

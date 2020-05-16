@@ -123,7 +123,7 @@ impl<'a, I> Iterator for ImageParagraphFilter<I>
 where
     I: Iterator<Item = Event<'a>>,
 {
-    type Item = Event<'a>;
+    type Item = (Event<'a>, bool); // Hack for standalone images bool
 
     fn next(&mut self) -> Option<Self::Item> {
         // We want to check 5 ahead because that's open-paragraph, image, text,
@@ -157,9 +157,9 @@ where
                 self.queue.push_front(im_end);
                 self.queue.push_front(im_text);
 
-                Some(im_start)
+                Some((im_start, true))
             }
-            _ => first,
+            _ => first.map(|a| (a, false)),
         };
 
         res
@@ -221,10 +221,10 @@ where
     }
 
     pub fn run(mut self) -> io::Result<()> {
-        while let Some(event) = self.iter.next() {
+        while let Some((event, is_standalone)) = self.iter.next() {
             match event {
                 Start(tag) => {
-                    self.start_tag(tag)?;
+                    self.start_tag(tag, is_standalone)?;
                 }
                 End(tag) => {
                     self.end_tag(tag)?;
@@ -275,7 +275,7 @@ where
     }
 
     /// Writes the start of an HTML tag.
-    fn start_tag(&mut self, tag: Tag<'a>) -> io::Result<()> {
+    fn start_tag(&mut self, tag: Tag<'a>, is_standalone: bool) -> io::Result<()> {
         match tag {
             Tag::Paragraph => {
                 if self.end_newline {
@@ -403,6 +403,9 @@ where
                 self.write("\">")
             }
             Tag::Image(_link_type, dest, title) => {
+                if is_standalone {
+                    self.write("<div class=\"image-container\">\n")?;
+                }
                 self.write("<img src=\"")?;
                 escape_href(&mut self.writer, &dest)?;
                 self.write("\" alt=\"")?;
@@ -411,7 +414,17 @@ where
                     self.write("\" title=\"")?;
                     escape_html(&mut self.writer, &title)?;
                 }
-                self.write("\" />")
+                self.write("\" />")?;
+
+                if is_standalone {
+                    self.write("\n<div class=\"image-caption\">")?;
+                    escape_html(&mut self.writer, &title)?;
+                    self.write("</div>\n")?;
+                    self.write("</div>\n")?;
+                    self.write("<p>\n")?;
+                }
+
+                Ok(())
             }
             Tag::FootnoteDefinition(name) => {
                 if self.end_newline {
@@ -498,7 +511,7 @@ where
     // run raw text, consuming end tag
     fn raw_text(&mut self) -> io::Result<()> {
         let mut nest = 0;
-        while let Some(event) = self.iter.next() {
+        while let Some((event, _)) = self.iter.next() {
             match event {
                 Start(_) => nest += 1,
                 End(_) => {

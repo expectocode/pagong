@@ -1,4 +1,5 @@
 // Copyright 2015 Google Inc. All rights reserved.
+// Modifications Copyright 2020 Tortuga Authors
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
 // of this software and associated documentation files (the "Software"), to deal
@@ -20,7 +21,7 @@
 
 //! HTML renderer that takes an iterator of events as input.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::fmt::{Arguments, Write as FmtWrite};
 use std::io::{self, ErrorKind, Write};
 
@@ -92,6 +93,32 @@ where
     }
 }
 
+struct ImageParagraphFilter<I: Iterator> {
+    iter: I,
+    queue: VecDeque<I::Item>,
+}
+
+impl<'a, I: Iterator> ImageParagraphFilter<I> {
+    fn new(iter: I) -> Self {
+        Self {
+            iter,
+            queue: VecDeque::new(),
+        }
+    }
+}
+
+impl<'a, I> Iterator for ImageParagraphFilter<I>
+where
+    I: Iterator<Item = Event<'a>>,
+{
+    type Item = Event<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let next = self.iter.next();
+        next
+    }
+}
+
 struct HtmlWriter<'a, I, W> {
     /// Iterator supplying events.
     iter: I,
@@ -111,14 +138,14 @@ struct HtmlWriter<'a, I, W> {
     numbers: HashMap<CowStr<'a>, usize>,
 }
 
-impl<'a, I, W> HtmlWriter<'a, I, W>
+impl<'a, I, W> HtmlWriter<'a, ImageParagraphFilter<I>, W>
 where
     I: Iterator<Item = Event<'a>>,
     W: StrWrite,
 {
     fn new(iter: I, writer: W) -> Self {
         Self {
-            iter,
+            iter: ImageParagraphFilter::new(iter),
             writer,
             title_written: false,
             end_newline: true,

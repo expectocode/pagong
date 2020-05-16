@@ -126,24 +126,30 @@ where
     type Item = Event<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        // We want to check 5 ahead because that's open-paragraph, image, text, close-image, close-paragraph.
+        // We want to check 5 ahead because that's open-paragraph, image, text,
+        // close-image, close-paragraph.
         self.lookahead_n(5);
         let first = self.queue.pop_front();
-        let second = self.queue.get(0);
-        let third = self.queue.get(1);
-        let fourth = self.queue.get(2);
-        let fifth = self.queue.get(3);
+
+        let buffer = [
+            first.as_ref(),
+            self.queue.get(0),
+            self.queue.get(1),
+            self.queue.get(2),
+            self.queue.get(3),
+        ];
 
         use Tag::{Image, Paragraph};
 
-        match (&first, second, third, fourth, fifth) {
-            (
+        #[rustfmt::skip]
+        let res = match buffer {
+            [
                 Some(Start(Paragraph)),
                 Some(Start(Image(..))),
                 Some(Text(_)),
                 Some(End(Image(..))),
-                Some(End(Paragraph)),
-            ) => {
+                Some(End(Paragraph))
+            ] => {
                 let im_start = self.queue.pop_front().unwrap();
                 let im_text = self.queue.pop_front().unwrap();
                 let im_end = self.queue.pop_front().unwrap();
@@ -154,7 +160,9 @@ where
                 Some(im_start)
             }
             _ => first,
-        }
+        };
+
+        res
     }
 }
 

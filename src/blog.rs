@@ -24,6 +24,7 @@ fn generate_html(post: &Post, header: &str, footer: &str, css: &str) -> String {
 <html>
 <head>
 <meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
 "#,
     );
     html.push_str(&format!("<title>{}</title>\n", post.title));

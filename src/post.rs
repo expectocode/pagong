@@ -168,8 +168,16 @@ impl Post {
         }
     }
 
-    pub fn generate_summary(&self) -> String {
-        "TODO: proper summary".to_string()
+    pub fn generate_summary(&self) -> Option<String> {
+        let mut expecting_text = false;
+        Parser::new(&self.markdown).find_map(|e| match e {
+            Event::Start(Tag::Paragraph) => {
+                expecting_text = true;
+                None
+            }
+            Event::Text(text) if expecting_text => Some(text.to_string()),
+            _ => None,
+        })
     }
 
     pub fn write_html(&self, header: &str, footer: &str, out: &mut String) {
@@ -275,5 +283,59 @@ Some words.";
 
         let date = Local.ymd(2020, 05, 05);
         assert_eq!(post.modified, date.clone());
+    }
+
+    /// Check that the summary is found correctly.
+    #[test]
+    fn find_no_summary() {
+        let content = r#"
+# My blog post
+
+```rust
+println!("Jokes on you, this is not a summary but 🦀!");
+```
+"#;
+        let assets = vec![];
+        let date = TimeZone::ymd(&Local, 1999, 12, 01);
+        let meta = Metadata {
+            title: None,
+            path: "test_post".into(),
+            created: date.clone(),
+            modified: date.clone(),
+        };
+
+        let post = Post::from_sources(content.into(), assets, meta);
+        assert_eq!(post.generate_summary(), None);
+    }
+
+    /// Check that the summary is found correctly.
+    #[test]
+    fn find_summary() {
+        let content = r#"
+# My blog post
+
+```rust
+println!("Not quite yet a summary…");
+```
+
+This totally summarizes the post.
+
+However, this does not.
+"#;
+        let assets = vec![];
+        let date = TimeZone::ymd(&Local, 1999, 12, 01);
+        let meta = Metadata {
+            title: None,
+            path: "test_post".into(),
+            created: date.clone(),
+            modified: date.clone(),
+        };
+
+        let post = Post::from_sources(content.into(), assets, meta);
+
+        assert_eq!(
+            post.generate_summary(),
+            Some("This totally summarizes the post.".to_string())
+        );
     }
 }

@@ -200,9 +200,11 @@ impl Blog {
             content: FeedBuilder::default()
                 .title("tortuga") // TODO blog title
                 .id("tortuga") // TODO blog id?
-                .updated(chrono::DateTime::<chrono::FixedOffset>::from(
-                    sorted_posts[0].created.and_hms(0, 0, 0),
-                ))
+                .updated(if let Some(post) = sorted_posts.get(0) {
+                    chrono::DateTime::<chrono::FixedOffset>::from(post.created.and_hms(0, 0, 0))
+                } else {
+                    chrono::offset::Local::now().into()
+                })
                 .entries(entries)
                 .build()
                 .expect("required feed field missing")
@@ -235,7 +237,7 @@ mod tests {
 
         let actions = blog.generate_actions(root);
 
-        assert_eq!(actions.len(), 3);
+        assert_eq!(actions.len(), 4);
         assert!(matches!(&actions[0] ,
            FsAction::DeleteDir {
             path,
@@ -256,6 +258,13 @@ mod tests {
             source,
             dest,
            } if source == &source_css_file && dest == &gen_css_dir.join(CSS_FILE_NAME)
+        ));
+
+        assert!(matches!(&actions[3] ,
+            FsAction::WriteFile {
+                path,
+                content
+            } if path == Path::new("dist/atom.xml") && content.contains("http://www.w3.org/2005/Atom")
         ));
     }
 

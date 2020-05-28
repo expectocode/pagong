@@ -277,7 +277,7 @@ mod tests {
 
         let actions = blog.generate_actions("dist");
 
-        assert_eq!(actions.len(), 3);
+        assert_eq!(actions.len(), 4);
         assert!(matches!(&actions[0] ,
            FsAction::DeleteDir {
             path,
@@ -298,6 +298,13 @@ mod tests {
             path,
             content
            } if path == Path::new("dist/test_post/index.html") && content.contains("A test post")
+        ));
+
+        assert!(matches!(&actions[3] ,
+            FsAction::WriteFile {
+                path,
+                content
+            } if path == Path::new("dist/atom.xml") && content.contains("http://www.w3.org/2005/Atom")
         ));
     }
 }

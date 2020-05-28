@@ -11,7 +11,7 @@ use std::path::{Path, PathBuf};
 use chrono::offset::Local;
 use chrono::{Date, NaiveDate, TimeZone};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Post {
     pub markdown: String,
     /// The name that will become part of the post's URL
@@ -166,6 +166,10 @@ impl Post {
             created: meta.created,
             assets,
         }
+    }
+
+    pub fn generate_summary(&self) -> String {
+        "TODO: proper summary".to_string()
     }
 
     pub fn write_html(&self, header: &str, footer: &str, out: &mut String) {

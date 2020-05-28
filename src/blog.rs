@@ -6,6 +6,8 @@ use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 
+use atom_syndication::{ContentBuilder, EntryBuilder, FeedBuilder};
+
 // // TODO we don't handle title and other metadata like tags
 // // TODO if we want to do this proper we should not put header inside main
 
@@ -90,6 +92,7 @@ impl Blog {
     pub fn generate_actions<P: AsRef<Path>>(&self, root: P) -> Vec<FsAction> {
         let mut actions = vec![];
 
+        // Copy CSS assets
         if let Some(css_source) = &self.css_path {
             let css_path = root.as_ref().join(CSS_DIR_NAME);
 
@@ -108,7 +111,25 @@ impl Blog {
             });
         }
 
-        for post in self.posts.iter() {
+        // Sorting the posts so that the atom feed is correctly ordered.
+        // Do iter and collect to work over references and thus avoid cloning.
+        let mut sorted_posts: Vec<_> = self.posts.iter().collect();
+        sorted_posts.sort_by(|b, a| {
+            a.modified
+                .partial_cmp(&b.modified)
+                .expect("Failed to compare modified dates")
+                .then_with(|| {
+                    a.created
+                        .partial_cmp(&b.created)
+                        .expect("Failed to compare created dates")
+                        .then_with(|| a.title.cmp(&b.title))
+                })
+        });
+
+        // Because the atom feed also takes HTML content, generate both the
+        // HTML and the feed entries in the same place.
+        let mut entries = Vec::with_capacity(self.posts.len());
+        for &post in sorted_posts.iter() {
             // TODO override name with metadata
             let post_dir_name = &post.path;
             let post_dir = root.as_ref().join(post_dir_name);
@@ -127,10 +148,35 @@ impl Blog {
             let css = format!("../{}/{}", CSS_DIR_NAME, CSS_FILE_NAME);
             let header = self.header.as_ref().map(|s| s.as_str()).unwrap_or("");
             let footer = self.footer.as_ref().map(|s| s.as_str()).unwrap_or("");
+            let html = generate_html(post, header, footer, &css);
+
+            entries.push(
+                // Additionally, we could add author or category information here
+                EntryBuilder::default()
+                    .title(post.title.clone())
+                    .id(post_path.to_string_lossy().to_string())
+                    .updated(chrono::DateTime::<chrono::FixedOffset>::from(
+                        post.modified.and_hms(0, 0, 0),
+                    ))
+                    .published(chrono::DateTime::<chrono::FixedOffset>::from(
+                        post.created.and_hms(0, 0, 0),
+                    ))
+                    .summary(post.generate_summary())
+                    .content(
+                        ContentBuilder::default()
+                            .value(html.clone())
+                            .src(post_path.to_string_lossy().to_string())
+                            .content_type("html".to_string())
+                            .build()
+                            .expect("required content field missing"),
+                    )
+                    .build()
+                    .expect("required entry field missing"),
+            );
 
             actions.push(FsAction::WriteFile {
                 path: post_path,
-                content: generate_html(post, header, footer, &css),
+                content: html,
             });
 
             for asset in post.assets.iter() {
@@ -142,6 +188,22 @@ impl Blog {
                 });
             }
         }
+
+        // Generate atom feed
+        // Similarly, we could add author, contributor, icon, or logo information here
+        actions.push(FsAction::WriteFile {
+            path: root.as_ref().join("atom.xml").into(),
+            content: FeedBuilder::default()
+                .title("tortuga") // TODO blog title
+                .id("tortuga") // TODO blog id?
+                .updated(chrono::DateTime::<chrono::FixedOffset>::from(
+                    sorted_posts[0].created.and_hms(0, 0, 0),
+                ))
+                .entries(entries)
+                .build()
+                .expect("required feed field missing")
+                .to_string(),
+        });
 
         actions
     }

@@ -1,7 +1,7 @@
 use crate::html;
 use crate::FOLDER_POST_NAME;
 
-use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag};
+use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fs;
@@ -197,7 +197,8 @@ Modified {}</div>",
         };
 
         // Insert date after first element (usually the title)
-        let mut parser = Parser::new(&self.markdown).into_offset_iter(); // TODO options
+        let options = Options::all();
+        let mut parser = Parser::new_ext(&self.markdown, options).into_offset_iter();
         let (_, first_range) = parser.next().expect("Post must have at least one element");
         let main = self.markdown[first_range.clone()].to_string()
             + "\n"
@@ -207,7 +208,7 @@ Modified {}</div>",
 
         let input = header.to_string() + "\n" + &main + "\n" + footer;
 
-        let parser = Parser::new(&input); // TODO options
+        let parser = Parser::new_ext(&input, options);
         html::push_html(out, parser);
     }
 }

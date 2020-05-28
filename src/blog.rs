@@ -19,7 +19,7 @@ pub struct Blog {
     pub footer: Option<String>,
 }
 
-fn generate_html(post: &Post, header: &str, footer: &str, css: &str) -> String {
+fn generate_html(title: &str, css: &str, body_writer: &dyn Fn(&mut String)) -> String {
     let mut html = String::new();
     html.push_str(
         r#"<!DOCTYPE html>
@@ -29,7 +29,7 @@ fn generate_html(post: &Post, header: &str, footer: &str, css: &str) -> String {
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 "#,
     );
-    html.push_str(&format!("<title>{}</title>\n", post.title));
+    html.push_str(&format!("<title>{}</title>\n", title));
     html.push_str(&format!(r#"<link rel="stylesheet" href="{}">"#, css));
     html.push('\n');
     html.push_str(
@@ -38,7 +38,7 @@ fn generate_html(post: &Post, header: &str, footer: &str, css: &str) -> String {
                  <main>\n",
     );
 
-    post.write_html(header, footer, &mut html);
+    body_writer(&mut html);
 
     html.push_str(
         "</main>\n\
@@ -47,6 +47,12 @@ fn generate_html(post: &Post, header: &str, footer: &str, css: &str) -> String {
     );
 
     html
+}
+
+fn generate_post_html(post: &Post, header: &str, footer: &str, css: &str) -> String {
+    generate_html(&post.title, css, &|html| {
+        post.write_html(header, footer, html)
+    })
 }
 
 impl Blog {
@@ -90,6 +96,7 @@ impl Blog {
     }
 
     pub fn generate_actions<P: AsRef<Path>>(&self, root: P) -> Vec<FsAction> {
+        let blog_title = "tortuga".to_string(); // TODO user-provided
         let mut actions = vec![];
 
         // Copy CSS assets
@@ -145,10 +152,11 @@ impl Blog {
 
             let post_path = post_dir.join("index.html");
 
+            // TODO this looks like a bad way to handle the path to the css
             let css = format!("../{}/{}", CSS_DIR_NAME, CSS_FILE_NAME);
             let header = self.header.as_ref().map(|s| s.as_str()).unwrap_or("");
             let footer = self.footer.as_ref().map(|s| s.as_str()).unwrap_or("");
-            let html = generate_html(post, header, footer, &css);
+            let html = generate_post_html(post, header, footer, &css);
 
             let mut escaped_html = String::with_capacity(html.len());
             crate::escape::escape_html(&mut escaped_html, &html)
@@ -193,13 +201,35 @@ impl Blog {
             }
         }
 
+        // Generate main-page listing
+        actions.push(FsAction::WriteFile {
+            path: root.as_ref().join("index.html").into(),
+            content: generate_html(
+                &blog_title,
+                &format!("{}/{}", CSS_DIR_NAME, CSS_FILE_NAME),
+                &|mut html| {
+                    html.push_str("<ul>");
+                    sorted_posts.iter().for_each(|&post| {
+                        html.push_str("<li><a href=\"");
+                        crate::escape::escape_href(&mut html, &post.path.to_string_lossy())
+                            .expect("Should not fail to escape HREF in-memory");
+                        html.push_str("/index.html\">");
+                        crate::escape::escape_html(&mut html, &post.title)
+                            .expect("Should not fail to escape HTML in-memory");
+                        html.push_str("</a></li>");
+                    });
+                    html.push_str("</ul>");
+                },
+            ),
+        });
+
         // Generate atom feed
         // Similarly, we could add author, contributor, icon, or logo information here
         actions.push(FsAction::WriteFile {
             path: root.as_ref().join("atom.xml").into(),
             content: FeedBuilder::default()
-                .title("tortuga") // TODO blog title
-                .id("tortuga") // TODO blog id?
+                .title(blog_title.clone())
+                .id(blog_title)
                 .updated(if let Some(post) = sorted_posts.get(0) {
                     chrono::DateTime::<chrono::FixedOffset>::from(post.created.and_hms(0, 0, 0))
                 } else {
@@ -237,7 +267,7 @@ mod tests {
 
         let actions = blog.generate_actions(root);
 
-        assert_eq!(actions.len(), 4);
+        assert_eq!(actions.len(), 5);
         assert!(matches!(&actions[0] ,
            FsAction::DeleteDir {
             path,
@@ -264,6 +294,13 @@ mod tests {
             FsAction::WriteFile {
                 path,
                 content
+            } if path == Path::new("dist/index.html") && content.contains("<ul>")
+        ));
+
+        assert!(matches!(&actions[4] ,
+            FsAction::WriteFile {
+                path,
+                content
             } if path == Path::new("dist/atom.xml") && content.contains("http://www.w3.org/2005/Atom")
         ));
     }
@@ -286,7 +323,7 @@ mod tests {
 
         let actions = blog.generate_actions("dist");
 
-        assert_eq!(actions.len(), 4);
+        assert_eq!(actions.len(), 5);
         assert!(matches!(&actions[0] ,
            FsAction::DeleteDir {
             path,
@@ -310,6 +347,13 @@ mod tests {
         ));
 
         assert!(matches!(&actions[3] ,
+            FsAction::WriteFile {
+                path,
+                content
+            } if path == Path::new("dist/index.html") && content.contains("<ul>")
+        ));
+
+        assert!(matches!(&actions[4] ,
             FsAction::WriteFile {
                 path,
                 content

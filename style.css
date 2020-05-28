@@ -64,6 +64,25 @@ pre {
     max-height: 480px;
 }
 
+/* tables */
+
+table {
+    border-collapse: collapse;
+}
+
+th {
+    background-color: #f7f7e8;
+}
+
+th, td {
+    padding: 0.5em;
+    border: 1px solid #aaa;
+}
+
+tr:nth-child(even) {
+    background-color: #f7f7e8;
+}
+
 /* misc */
 
 p.time {

@@ -150,6 +150,10 @@ impl Blog {
             let footer = self.footer.as_ref().map(|s| s.as_str()).unwrap_or("");
             let html = generate_html(post, header, footer, &css);
 
+            let mut escaped_html = String::with_capacity(html.len());
+            crate::escape::escape_html(&mut escaped_html, &html)
+                .expect("Escaping html in-memory failed");
+
             entries.push(
                 // Additionally, we could add author or category information here
                 EntryBuilder::default()
@@ -164,7 +168,7 @@ impl Blog {
                     .summary(post.generate_summary())
                     .content(
                         ContentBuilder::default()
-                            .value(html.clone())
+                            .value(escaped_html)
                             .src(post_path.to_string_lossy().to_string())
                             .content_type("html".to_string())
                             .build()

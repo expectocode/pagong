@@ -170,7 +170,7 @@ impl Blog {
 
             let mut escaped_html = String::with_capacity(html.len());
             crate::escape::escape_html(&mut escaped_html, &html)
-                .expect("Escaping html in-memory failed");
+                .expect("Escaping HTML in-memory failed");
 
             entries.push(
                 // Additionally, we could add author or category information here
@@ -190,10 +190,10 @@ impl Blog {
                             .src(post_path.to_string_lossy().to_string())
                             .content_type("html".to_string())
                             .build()
-                            .expect("required content field missing"),
+                            .expect("Required content field missing"),
                     )
                     .build()
-                    .expect("required entry field missing"),
+                    .expect("Required entry field missing"),
             );
 
             actions.push(FsAction::WriteFile {
@@ -247,7 +247,7 @@ impl Blog {
                 })
                 .entries(entries)
                 .build()
-                .expect("required feed field missing")
+                .expect("Required feed field missing")
                 .to_string(),
         });
 

@@ -234,7 +234,7 @@ fn parse_date(date: &str) -> chrono::ParseResult<chrono::Date<Local>> {
     NaiveDate::parse_from_str(date, "%Y-%m-%d").map(|date| {
         TimeZone::from_local_date(&Local, &date)
             .latest()
-            .expect("there should always be a latest date")
+            .expect("There should always be a latest date")
     })
 }
 

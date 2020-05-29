@@ -21,7 +21,7 @@
 
 //! HTML renderer that takes an iterator of events as input.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Arguments, Write as FmtWrite};
 use std::io::{self, ErrorKind, Write};
 
@@ -29,21 +29,6 @@ use crate::escape::{escape_href, escape_html};
 
 use pulldown_cmark::Event::*;
 use pulldown_cmark::{Alignment, CodeBlockKind, CowStr, Event, LinkType, Tag};
-
-// TODO we may write duplicates
-fn write_heading_id<W: StrWrite>(mut writer: W, heading: &str) -> io::Result<()> {
-    let mut ignored_last = false;
-    for c in heading.trim().chars() {
-        if c.is_alphanumeric() {
-            ignored_last = false;
-            write!(writer, "{}", c.to_lowercase())?;
-        } else if !ignored_last {
-            ignored_last = true;
-            writer.write_str("_")?;
-        }
-    }
-    Ok(())
-}
 
 enum TableState {
     Head,
@@ -194,6 +179,9 @@ struct HtmlWriter<'a, I, W> {
     /// Are we expecting to write a heading's text next?
     expecting_heading_text: bool,
 
+    /// Heading identifiers generated so far.
+    heading_identifiers: HashSet<String>,
+
     /// Whether or not the last write wrote a newline.
     end_newline: bool,
 
@@ -214,12 +202,46 @@ where
             writer,
             title_written: false,
             expecting_heading_text: false,
+            heading_identifiers: HashSet::new(),
             end_newline: true,
             table_state: TableState::Head,
             table_alignments: vec![],
             table_cell_index: 0,
             numbers: HashMap::new(),
         }
+    }
+
+    /// Generate a new unique identifier for a heading.
+    fn generate_heading_id(&mut self, heading: &str) -> String {
+        const SEP_CHAR: char = '_';
+
+        let mut identifier = String::with_capacity(heading.len());
+        let mut ignored_last = false;
+        heading.chars().for_each(|c| {
+            if c.is_alphanumeric() {
+                ignored_last = false;
+                c.to_lowercase().for_each(|lc| identifier.push(lc));
+            } else if !ignored_last {
+                ignored_last = true;
+                identifier.push(SEP_CHAR);
+            }
+        });
+
+        if self.heading_identifiers.insert(identifier.clone()) {
+            return identifier;
+        }
+
+        for n in 2.. {
+            let new_identifier = format!("{}{}{}", identifier, SEP_CHAR, n);
+            if self.heading_identifiers.insert(new_identifier.clone()) {
+                return new_identifier;
+            }
+        }
+
+        panic!(format!(
+            "user somehow wrote {} identically-named headings",
+            usize::MAX - 2
+        ));
     }
 
     /// Writes a new line.
@@ -251,8 +273,8 @@ where
                 Text(text) => {
                     if self.expecting_heading_text {
                         self.expecting_heading_text = false;
-                        write_heading_id(&mut self.writer, &text)?;
-                        self.writer.write_str("\">")?;
+                        let identifier = self.generate_heading_id(&text);
+                        write!(&mut self.writer, "{}\">", identifier)?;
                     }
                     escape_html(&mut self.writer, &text)?;
                     self.end_newline = text.ends_with('\n');
@@ -314,6 +336,7 @@ where
                 } else {
                     self.writer.write_str("\n")?;
                 }
+                // TODO an anchor next to the title like "¶" would be great
                 write!(&mut self.writer, "<h{}", level)?;
                 if !self.title_written {
                     self.title_written = true;

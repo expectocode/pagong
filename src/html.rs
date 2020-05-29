@@ -30,6 +30,21 @@ use crate::escape::{escape_href, escape_html};
 use pulldown_cmark::Event::*;
 use pulldown_cmark::{Alignment, CodeBlockKind, CowStr, Event, LinkType, Tag};
 
+// TODO we may write duplicates
+fn write_heading_id<W: StrWrite>(mut writer: W, heading: &str) -> io::Result<()> {
+    let mut ignored_last = false;
+    for c in heading.trim().chars() {
+        if c.is_alphanumeric() {
+            ignored_last = false;
+            write!(writer, "{}", c.to_lowercase())?;
+        } else if !ignored_last {
+            ignored_last = true;
+            writer.write_str("_")?;
+        }
+    }
+    Ok(())
+}
+
 enum TableState {
     Head,
     Body,
@@ -176,6 +191,9 @@ struct HtmlWriter<'a, I, W> {
     /// Have we written out the post's title yet?
     title_written: bool,
 
+    /// Are we expecting to write a heading's text next?
+    expecting_heading_text: bool,
+
     /// Whether or not the last write wrote a newline.
     end_newline: bool,
 
@@ -195,6 +213,7 @@ where
             iter: ImageParagraphFilter::new(iter),
             writer,
             title_written: false,
+            expecting_heading_text: false,
             end_newline: true,
             table_state: TableState::Head,
             table_alignments: vec![],
@@ -230,6 +249,11 @@ where
                     self.end_tag(tag)?;
                 }
                 Text(text) => {
+                    if self.expecting_heading_text {
+                        self.expecting_heading_text = false;
+                        write_heading_id(&mut self.writer, &text)?;
+                        self.writer.write_str("\">")?;
+                    }
                     escape_html(&mut self.writer, &text)?;
                     self.end_newline = text.ends_with('\n');
                 }
@@ -295,7 +319,8 @@ where
                     self.title_written = true;
                     self.writer.write_str(" class=\"title\"")?;
                 }
-                self.writer.write_str(">")
+                self.expecting_heading_text = true;
+                write!(&mut self.writer, " id=\"")
             }
             Tag::Table(alignments) => {
                 self.table_alignments = alignments;

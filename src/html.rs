@@ -182,6 +182,9 @@ struct HtmlWriter<'a, I, W> {
     /// Heading identifiers generated so far.
     heading_identifiers: HashSet<String>,
 
+    /// Are we inside a footnote's definition?
+    inside_footnote_def: bool,
+
     /// Whether or not the last write wrote a newline.
     end_newline: bool,
 
@@ -203,6 +206,7 @@ where
             title_written: false,
             expecting_heading_text: false,
             heading_identifiers: HashSet::new(),
+            inside_footnote_def: false,
             end_newline: true,
             table_state: TableState::Head,
             table_alignments: vec![],
@@ -302,10 +306,14 @@ where
                 }
                 FootnoteReference(name) => {
                     let len = self.numbers.len() + 1;
-                    self.write("<sup class=\"footnote-reference\"><a href=\"#")?;
+                    let number = *self.numbers.entry(name.clone()).or_insert(len);
+                    write!(
+                        &mut self.writer,
+                        "<sup class=\"footnote-reference\" id=\"{}r\"><a href=\"#",
+                        number
+                    )?;
                     escape_html(&mut self.writer, &name)?;
                     self.write("\">")?;
-                    let number = *self.numbers.entry(name).or_insert(len);
                     write!(&mut self.writer, "{}", number)?;
                     self.write("</a></sup>")?;
                 }
@@ -324,7 +332,9 @@ where
     fn start_tag(&mut self, tag: Tag<'a>, is_standalone: bool) -> io::Result<()> {
         match tag {
             Tag::Paragraph => {
-                if self.end_newline {
+                if self.inside_footnote_def {
+                    Ok(())
+                } else if self.end_newline {
                     self.write("<p>")
                 } else {
                     self.write("\n<p>")
@@ -475,17 +485,18 @@ where
                 Ok(())
             }
             Tag::FootnoteDefinition(name) => {
+                self.inside_footnote_def = true;
                 if self.end_newline {
-                    self.write("<div class=\"footnote-definition\" id=\"")?;
+                    self.write("<p class=\"footnote\" id=\"")?;
                 } else {
-                    self.write("\n<div class=\"footnote-definition\" id=\"")?;
+                    self.write("\n<p class=\"footnote\" id=\"")?;
                 }
                 escape_html(&mut self.writer, &*name)?;
-                self.write("\"><sup class=\"footnote-definition-label\">")?;
+                self.write("\"><sup>")?;
                 let len = self.numbers.len() + 1;
                 let number = *self.numbers.entry(name).or_insert(len);
                 write!(&mut self.writer, "{}", number)?;
-                self.write("</sup>")
+                self.write("</sup> ")
             }
         }
     }
@@ -493,7 +504,9 @@ where
     fn end_tag(&mut self, tag: Tag) -> io::Result<()> {
         match tag {
             Tag::Paragraph => {
-                self.write("</p>\n")?;
+                if !self.inside_footnote_def {
+                    self.write("</p>\n")?;
+                }
             }
             Tag::Heading(level) => {
                 self.write("</h")?;
@@ -549,8 +562,9 @@ where
                 self.write("</a>")?;
             }
             Tag::Image(_, _, _) => (), // shouldn't happen, handled in start
-            Tag::FootnoteDefinition(_) => {
-                self.write("</div>\n")?;
+            Tag::FootnoteDefinition(name) => {
+                self.inside_footnote_def = false;
+                write!(&mut self.writer, " <a href=\"#{}r\">↩</a></p>\n", name)?;
             }
         }
         Ok(())

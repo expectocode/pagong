@@ -323,7 +323,7 @@ title: Bad Meta
         assert_eq!(post.title, "Bad Meta");
     }
 
-    /// Check that an invalid meta block does not cause the program to panic.
+    /// Check that a meta key with no value does not cause the program to panic.
     #[test]
     fn missing_value_in_meta_block_wont_crash() {
         let content = "``` meta
@@ -344,7 +344,7 @@ title or not to title
         assert_eq!(post.markdown, ":D");
     }
 
-    /// Check that an invalid meta block does not cause the program to panic.
+    /// Check that an invalid date does not cause the program to panic.
     #[test]
     fn bad_date_wont_crash() {
         let content = "``` meta

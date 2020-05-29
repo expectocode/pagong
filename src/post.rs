@@ -167,6 +167,15 @@ impl Post {
 
     /// Partially parses markdown to apply meta overrides
     fn from_sources(mut markdown: String, assets: Vec<PathBuf>, mut meta: Metadata) -> Self {
+        // UTF-8 BOM becomes zero-width non-breaking space, which `trim()` won't remove,
+        // but if we leave it there then metadata loading will break and not recognise
+        // where the meta code block starts correctly.
+        //
+        // Remove it here to avoid such issue (allocating only if needed).
+        if markdown.contains("\u{FEFF}") {
+            markdown = markdown.replace("\u{FEFF}", "");
+        }
+
         if let Some(remove_range) = meta.update_from_contents(&markdown) {
             markdown.replace_range(remove_range, "");
         }
@@ -326,7 +335,7 @@ title: Bad Meta
     /// Check that a meta key with no value does not cause the program to panic.
     #[test]
     fn missing_value_in_meta_block_wont_crash() {
-        let content = "``` meta
+        let content = "```meta
 title or not to title
 ```
 
@@ -347,7 +356,7 @@ title or not to title
     /// Check that an invalid date does not cause the program to panic.
     #[test]
     fn bad_date_wont_crash() {
-        let content = "``` meta
+        let content = "```meta
 created: today lol
 ```
 
@@ -363,6 +372,32 @@ created: today lol
 
         let post = Post::from_sources(content.into(), assets, meta);
         assert_eq!(post.markdown, ":-O");
+    }
+
+    /// Check that UTF-8 with BOM does not break meta parsing.
+    #[test]
+    fn utf8_bom_works_fine() {
+        let content = String::from_utf8(
+            b"\xEF\xBB\xBF```meta
+```
+
+# Boom"
+                .iter()
+                .copied()
+                .collect(),
+        )
+        .unwrap();
+        let assets = vec![];
+        let date = TimeZone::ymd(&Local, 1999, 12, 01);
+        let meta = Metadata {
+            title: None,
+            path: "test_post".into(),
+            created: date.clone(),
+            modified: date.clone(),
+        };
+
+        let post = Post::from_sources(content, assets, meta);
+        assert_eq!(post.title, "Boom");
     }
 
     /// Check that the summary is found correctly.

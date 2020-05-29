@@ -79,13 +79,13 @@ impl Metadata {
                 match key.to_lowercase().as_ref() {
                     "title" => self.title = Some(value.trim().to_string()),
                     "path" => self.path = value.trim().into(),
-                    "created" => {
+                    "created" | "published" => {
                         self.created = parse_date(value)
-                            .expect(&format!("Invalid `created` override \"{}\"", value));
+                            .expect(&format!("Invalid `{}` override \"{}\"", key, value));
                     }
-                    "modified" => {
+                    "modified" | "updated" => {
                         self.modified = parse_date(value)
-                            .expect(&format!("Invalid `modified` override \"{}\"", value));
+                            .expect(&format!("Invalid `{}` override \"{}\"", key, value));
                     }
                     _ => {
                         eprintln!(

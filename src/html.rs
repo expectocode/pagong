@@ -279,6 +279,11 @@ where
                         self.expecting_heading_text = false;
                         let identifier = self.generate_heading_id(&text);
                         write!(&mut self.writer, "{}\">", identifier)?;
+                        write!(
+                            &mut self.writer,
+                            "<a class=\"anchor\" href=\"#{}\">¶</a>",
+                            identifier
+                        )?;
                     }
                     escape_html(&mut self.writer, &text)?;
                     self.end_newline = text.ends_with('\n');
@@ -346,7 +351,6 @@ where
                 } else {
                     self.writer.write_str("\n")?;
                 }
-                // TODO an anchor next to the title like "¶" would be great
                 write!(&mut self.writer, "<h{}", level)?;
                 if !self.title_written {
                     self.title_written = true;

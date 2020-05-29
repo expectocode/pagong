@@ -28,6 +28,19 @@ h1, h2 {
     border-bottom: 1px solid #000;
 }
 
+h1:not(.title):hover .anchor, h2:hover .anchor, h3:hover .anchor, h4:hover .anchor, h5:hover .anchor, h6:hover .anchor {
+    opacity: 1;
+}
+
+.anchor {
+    /* a distance of 0.9 is used because it feels right */
+    padding-right: 0.4ch;
+    margin-left: -1.3ch;
+    float: left;
+    opacity: 0;
+    transition: opacity 150ms;
+}
+
 /* body text */
 
 p, li {

@@ -1,8 +1,6 @@
-use crate::html;
-use crate::FOLDER_POST_NAME;
+use crate::{html, AppError, FOLDER_POST_NAME};
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
-use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::ops::Range;
@@ -104,7 +102,7 @@ impl Metadata {
 impl Post {
     /// Construct a post from a standalone title.md or a title/ directory
     /// containing a post.md and optional assets. Performs I/O.
-    pub fn from_source_file<P: AsRef<Path>>(path: P) -> Result<Self, Box<dyn Error>> {
+    pub fn from_source_file<P: AsRef<Path>>(path: P) -> Result<Self, AppError> {
         let post_path = if path.as_ref().is_file() {
             path.as_ref().to_path_buf()
         } else if path.as_ref().is_dir() {
@@ -113,19 +111,37 @@ impl Post {
             unreachable!("Followed symlink is not file or directory");
         };
 
-        let content = fs::read_to_string(&post_path)?;
+        let content = fs::read_to_string(&post_path).map_err(|e| AppError::ReadFile {
+            source: e,
+            path: post_path.clone(),
+        })?;
 
-        let post_metadata = post_path.metadata()?;
-        let created = post_metadata.created()?;
-        let modified = post_metadata.modified()?;
+        let post_metadata = post_path.metadata().map_err(|e| AppError::FileMeta {
+            source: e,
+            path: post_path.clone(),
+        })?;
+        let created = post_metadata.created().map_err(|e| AppError::FileMeta {
+            source: e,
+            path: post_path.clone(),
+        })?;
+        let modified = post_metadata.modified().map_err(|e| AppError::FileMeta {
+            source: e,
+            path: post_path.clone(),
+        })?;
 
         let created = chrono::DateTime::from(created).date();
         let modified = chrono::DateTime::from(modified).date();
 
         let mut assets = vec![];
         if path.as_ref().is_dir() {
-            for child in fs::read_dir(path.as_ref())? {
-                let child = child?;
+            for child in fs::read_dir(path.as_ref()).map_err(|e| AppError::ReadDir {
+                source: e,
+                path: path.as_ref().into(),
+            })? {
+                let child = child.map_err(|e| AppError::IterDir {
+                    source: e,
+                    path: path.as_ref().into(),
+                })?;
                 if child.path().extension() != Some(&OsStr::new("md")) {
                     // don't add .md files as assets
                     assets.push(child.path());

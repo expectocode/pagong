@@ -1,9 +1,7 @@
 use crate::fs_action::{execute_fs_actions, FsAction};
-use crate::{Post, CSS_DIR_NAME, CSS_FILE_NAME, FOOTER_FILE_NAME, HEADER_FILE_NAME};
+use crate::{AppError, Post, CSS_DIR_NAME, CSS_FILE_NAME, FOOTER_FILE_NAME, HEADER_FILE_NAME};
 
-use std::error::Error;
 use std::fs;
-use std::io;
 use std::path::{Path, PathBuf};
 
 use atom_syndication::{ContentBuilder, EntryBuilder, FeedBuilder};
@@ -56,22 +54,34 @@ fn generate_post_html(post: &Post, header: &str, footer: &str, css: &str) -> Str
 }
 
 impl Blog {
-    pub fn from_source_dir<P: AsRef<Path>>(root: P) -> Result<Self, Box<dyn Error>> {
+    pub fn from_source_dir<P: AsRef<Path>>(root: P) -> Result<Self, AppError> {
         let mut posts = vec![];
         let mut header = None;
         let mut footer = None;
         let mut css_path = None;
 
-        for child in fs::read_dir(root)? {
-            let child = child?;
+        for child in fs::read_dir(root.as_ref()).map_err(|e| AppError::ReadDir {
+            source: e,
+            path: root.as_ref().into(),
+        })? {
+            let child = child.map_err(|e| AppError::IterDir {
+                source: e,
+                path: root.as_ref().into(),
+            })?;
             let path = child.path();
 
             if let Some(name) = path.file_name() {
                 if name == HEADER_FILE_NAME {
-                    header = Some(fs::read_to_string(&path)?);
+                    header = Some(
+                        fs::read_to_string(&path)
+                            .map_err(|e| AppError::ReadFile { source: e, path })?,
+                    );
                     continue;
                 } else if name == FOOTER_FILE_NAME {
-                    footer = Some(fs::read_to_string(&path)?);
+                    footer = Some(
+                        fs::read_to_string(&path)
+                            .map_err(|e| AppError::ReadFile { source: e, path })?,
+                    );
                     continue;
                 } else if name == CSS_FILE_NAME {
                     css_path = Some(path.clone());
@@ -90,7 +100,7 @@ impl Blog {
         })
     }
 
-    pub fn generate<P: AsRef<Path>>(&self, root: P) -> io::Result<()> {
+    pub fn generate<P: AsRef<Path>>(&self, root: P) -> Result<(), AppError> {
         let actions = self.generate_actions(root);
         execute_fs_actions(&actions)
     }

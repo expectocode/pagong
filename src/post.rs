@@ -62,13 +62,10 @@ impl Metadata {
     }
 
     fn update_from_meta_contents(&mut self, contents: &str) {
-        let contents = contents
-            .trim_start_matches("```meta")
-            .trim_end_matches("```");
-
         contents
             .split('\n')
-            .filter(|line| !line.is_empty())
+            .skip(1) // ```meta
+            .filter(|line| !line.is_empty() && line.trim() != "```")
             .for_each(|line| {
                 let mut kv = line.splitn(2, ':');
                 let key = kv.next().unwrap();
@@ -300,6 +297,27 @@ Some words.";
 
         let date = Local.ymd(2020, 05, 05);
         assert_eq!(post.modified, date.clone());
+    }
+
+    /// Check that an invalid meta block does not cause the program to panic.
+    #[test]
+    fn bad_meta_block_wont_crash() {
+        let content = "``` meta
+title: Bad Meta
+```
+
+:)";
+        let assets = vec![];
+        let date = TimeZone::ymd(&Local, 1999, 12, 01);
+        let meta = Metadata {
+            title: None,
+            path: "test_post".into(),
+            created: date.clone(),
+            modified: date.clone(),
+        };
+
+        let post = Post::from_sources(content.into(), assets, meta);
+        assert_eq!(post.title, "Bad Meta");
     }
 
     /// Check that the summary is found correctly.

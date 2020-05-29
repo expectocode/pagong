@@ -72,26 +72,26 @@ impl Metadata {
             let value = if let Some(v) = kv.next() {
                 v
             } else {
-                eprintln!("Ignoring meta override key \"{}\" in post {:?} because it does not have a value", line, self.path);
+                eprintln!("Ignoring meta override line {:?} in post {:?} because it does not have a value", line, self.path);
                 continue;
             };
 
             match key.to_lowercase().as_ref() {
                 "title" => self.title = Some(value.trim().to_string()),
                 "path" => self.path = value.trim().into(),
-                "created" | "published" => {
-                    self.created = parse_date(value)
-                        .expect(&format!("Invalid `{}` override \"{}\"", key, value));
-                }
-                "modified" | "updated" => {
-                    self.modified = parse_date(value)
-                        .expect(&format!("Invalid `{}` override \"{}\"", key, value));
-                }
+                "created" | "published" => match parse_date(value) {
+                    Ok(date) => self.created = date,
+                    Err(_) => eprintln!("Invalid {:?} override value for {:?} in post {:?} because the format was not YYYY-mm-dd", value, key, self.path),
+                },
+                "modified" | "updated" => match parse_date(value) {
+                    Ok(date) => self.modified = date,
+                    Err(_) => eprintln!("Invalid {:?} override value for {:?} in post {:?} because the format was not YYYY-mm-dd", value, key, self.path),
+                },
                 _ => {
                     eprintln!(
-                        "Unexpected meta override key \"{}\" in post {}, ignoring.",
+                        "Unexpected meta override key {:?} in post {:?}, ignoring.",
                         key,
-                        self.path.to_string_lossy()
+                        self.path
                     );
                 }
             }
@@ -230,12 +230,12 @@ Modified {}</div>",
 }
 
 /// Parse a string of the form YYYY-MM-DD into a "local" Date
-fn parse_date(date: &str) -> Option<chrono::Date<Local>> {
-    let naive = NaiveDate::parse_from_str(date, "%Y-%m-%d");
-    naive
-        .ok()
-        .map(|date| TimeZone::from_local_date(&Local, &date).latest())
-        .expect("Override date should be valid YYYY-MM-DD")
+fn parse_date(date: &str) -> chrono::ParseResult<chrono::Date<Local>> {
+    NaiveDate::parse_from_str(date, "%Y-%m-%d").map(|date| {
+        TimeZone::from_local_date(&Local, &date)
+            .latest()
+            .expect("there should always be a latest date")
+    })
 }
 
 #[cfg(test)]
@@ -342,6 +342,27 @@ title or not to title
 
         let post = Post::from_sources(content.into(), assets, meta);
         assert_eq!(post.markdown, ":D");
+    }
+
+    /// Check that an invalid meta block does not cause the program to panic.
+    #[test]
+    fn bad_date_wont_crash() {
+        let content = "``` meta
+created: today lol
+```
+
+:-O";
+        let assets = vec![];
+        let date = TimeZone::ymd(&Local, 1999, 12, 01);
+        let meta = Metadata {
+            title: None,
+            path: "test_post".into(),
+            created: date.clone(),
+            modified: date.clone(),
+        };
+
+        let post = Post::from_sources(content.into(), assets, meta);
+        assert_eq!(post.markdown, ":-O");
     }
 
     /// Check that the summary is found correctly.

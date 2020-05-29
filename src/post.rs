@@ -62,37 +62,40 @@ impl Metadata {
     }
 
     fn update_from_meta_contents(&mut self, contents: &str) {
-        contents
+        for line in contents
             .split('\n')
             .skip(1) // ```meta
             .filter(|line| !line.is_empty() && line.trim() != "```")
-            .for_each(|line| {
-                let mut kv = line.splitn(2, ':');
-                let key = kv.next().unwrap();
-                let value = kv
-                    .next()
-                    .expect(&format!("Meta line \"{}\" should contain a colon", line));
+        {
+            let mut kv = line.splitn(2, ':');
+            let key = kv.next().unwrap();
+            let value = if let Some(v) = kv.next() {
+                v
+            } else {
+                eprintln!("Ignoring meta override key \"{}\" in post {:?} because it does not have a value", line, self.path);
+                continue;
+            };
 
-                match key.to_lowercase().as_ref() {
-                    "title" => self.title = Some(value.trim().to_string()),
-                    "path" => self.path = value.trim().into(),
-                    "created" | "published" => {
-                        self.created = parse_date(value)
-                            .expect(&format!("Invalid `{}` override \"{}\"", key, value));
-                    }
-                    "modified" | "updated" => {
-                        self.modified = parse_date(value)
-                            .expect(&format!("Invalid `{}` override \"{}\"", key, value));
-                    }
-                    _ => {
-                        eprintln!(
-                            "Unexpected meta override key \"{}\" in post {}, ignoring.",
-                            key,
-                            self.path.to_string_lossy()
-                        );
-                    }
+            match key.to_lowercase().as_ref() {
+                "title" => self.title = Some(value.trim().to_string()),
+                "path" => self.path = value.trim().into(),
+                "created" | "published" => {
+                    self.created = parse_date(value)
+                        .expect(&format!("Invalid `{}` override \"{}\"", key, value));
                 }
-            });
+                "modified" | "updated" => {
+                    self.modified = parse_date(value)
+                        .expect(&format!("Invalid `{}` override \"{}\"", key, value));
+                }
+                _ => {
+                    eprintln!(
+                        "Unexpected meta override key \"{}\" in post {}, ignoring.",
+                        key,
+                        self.path.to_string_lossy()
+                    );
+                }
+            }
+        }
     }
 }
 
@@ -318,6 +321,27 @@ title: Bad Meta
 
         let post = Post::from_sources(content.into(), assets, meta);
         assert_eq!(post.title, "Bad Meta");
+    }
+
+    /// Check that an invalid meta block does not cause the program to panic.
+    #[test]
+    fn missing_value_in_meta_block_wont_crash() {
+        let content = "``` meta
+title or not to title
+```
+
+:D";
+        let assets = vec![];
+        let date = TimeZone::ymd(&Local, 1999, 12, 01);
+        let meta = Metadata {
+            title: None,
+            path: "test_post".into(),
+            created: date.clone(),
+            modified: date.clone(),
+        };
+
+        let post = Post::from_sources(content.into(), assets, meta);
+        assert_eq!(post.markdown, ":D");
     }
 
     /// Check that the summary is found correctly.

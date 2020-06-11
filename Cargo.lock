@@ -99,6 +99,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pagong"
+version = "0.1.0"
+dependencies = [
+ "atom_syndication",
+ "chrono",
+ "pulldown-cmark",
+]
+
+[[package]]
 name = "pulldown-cmark"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -128,15 +137,6 @@ checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "tortuga"
-version = "0.1.0"
-dependencies = [
- "atom_syndication",
- "chrono",
- "pulldown-cmark",
 ]
 
 [[package]]

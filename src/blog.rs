@@ -106,7 +106,7 @@ impl Blog {
     }
 
     pub fn generate_actions<P: AsRef<Path>>(&self, root: P) -> Vec<FsAction> {
-        let blog_title = "tortuga".to_string(); // TODO user-provided
+        let blog_title = "pagong".to_string(); // TODO user-provided
         let mut actions = vec![];
 
         // Copy CSS assets

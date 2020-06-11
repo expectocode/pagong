@@ -1,4 +1,4 @@
-# Tortuga ![tortuga's logo](logo.svg)
+# Pagong ![pagong's logo](logo.svg)
 
 > *Write markdown, get a static site*
 
@@ -8,23 +8,23 @@ This project is a bit of a work in progress. Expect more nice things to come!
 
 ### Installation
 
-Install `tortuga` by running the following command on a terminal:
+Install `pagong` by running the following command on a terminal:
 
 ```sh
-cargo install --git https://github.com/expectocode/tortuga
+cargo install --git https://github.com/expectocode/pagong
 ```
 
 Then use it in your blog's root folder:
 
 ```sh
-tortuga
+pagong
 ```
 
 It's that simple!
 
 ### Blog structure
 
-For `tortuga` to do anything useful, you need to have some entries for your blog. These should be written in markdown and saved in the `content/` directory as `.md` files. For example:
+For `pagong` to do anything useful, you need to have some entries for your blog. These should be written in markdown and saved in the `content/` directory as `.md` files. For example:
 
 ```
 myblog/
@@ -33,7 +33,7 @@ myblog/
     └── style.css
 ```
 
-Running `tortuga` while inside `myblog` will create the following `dist/` folder, and the tree of your blog now looks like this:
+Running `pagong` while inside `myblog` will create the following `dist/` folder, and the tree of your blog now looks like this:
 
 ```
 myblog/
@@ -53,7 +53,7 @@ Now you can move the contents of `dist/` to wherever you host your site and enjo
 
 ### Styling
 
-We provide a [default `style.css`](https://raw.githubusercontent.com/expectocode/tortuga/master/style.css) that you need to copy into your `content/` folder if you want your blog to look pretty. This is completely optional, and you can also write your own if you want.
+We provide a [default `style.css`](https://raw.githubusercontent.com/expectocode/pagong/master/style.css) that you need to copy into your `content/` folder if you want your blog to look pretty. This is completely optional, and you can also write your own if you want.
 
 ## Customization
 
@@ -79,7 +79,7 @@ Inside `post.md`, you can simply refer to `asset.jpg` to make use of it:
 
 ### Post metadata
 
-Post metadata is included within the `.md` itself as a fenced block with the `"meta"` language at the beginning of the post's content. This code block won't be directly visible in the generated HTML, but will instruct `tortuga` how to do certain things. For example, in `post.md`:
+Post metadata is included within the `.md` itself as a fenced block with the `"meta"` language at the beginning of the post's content. This code block won't be directly visible in the generated HTML, but will instruct `pagong` how to do certain things. For example, in `post.md`:
 
 <pre>
 ```meta
@@ -104,6 +104,6 @@ The names for the metadata keys or classes to be used in the CSS should generall
 
 ## License
 
-Tortuga is licensed under either of Apache License, Version 2.0 or MIT license at your option.
+Pagong is licensed under either of Apache License, Version 2.0 or MIT license at your option.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this crate by you, as defined in the Apache-2.0 license, shall be dual licensed as above, without any additional terms or conditions.

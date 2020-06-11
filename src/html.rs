@@ -643,7 +643,7 @@ where
 #[cfg(test)]
 mod test {
     use super::*;
-    use pulldown_cmark::Parser;
+    use pulldown_cmark::{Options, Parser};
 
     #[test]
     fn standalone_images_are_not_paragraphs() {
@@ -663,5 +663,39 @@ Some text below.";
             image_paragraph,
             [(Start(Tag::Image(..)), true), (Text(_), false), (End(Tag::Image(..)), false)]
         ));
+    }
+
+    #[test]
+    fn check_footnotes() {
+        let input = "Some text above
+
+Introducing a footnote[^foot].
+
+Some text below.
+
+[^foot]: Footnote explanation.
+";
+
+        let parser = Parser::new_ext(input, Options::all());
+
+        let html = {
+            let mut buffer = String::new();
+            push_html(&mut buffer, parser);
+            buffer
+        };
+
+        assert!(html.contains("id=\"r.foot"), "missing return id");
+        assert!(html.contains("id=\"f.foot"), "missing footnote id");
+        assert!(html.contains("#r.foot"), "missing return link");
+        assert!(html.contains("#f.foot"), "missing footnote link");
+
+        assert!(
+            html.find("id=\"r.foot").unwrap() < html.find("#r.foot").unwrap(),
+            "return id should be before return link"
+        );
+        assert!(
+            html.find("id=\"f.foot").unwrap() > html.find("#f.foot").unwrap(),
+            "footnote id should be after footnote link"
+        );
     }
 }

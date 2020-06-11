@@ -69,9 +69,9 @@ dependencies = [
 
 [[package]]
 name = "libc"
-version = "0.2.69"
+version = "0.2.71"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99e85c08494b21a9054e7fe1374a732aeadaff3980b6990b94bfd3a70f690005"
+checksum = "9457b06509d27052635f90d6466700c65095fdf75409b3fbdd903e988b886f49"
 
 [[package]]
 name = "memchr"
@@ -156,9 +156,9 @@ checksum = "caaa9d531767d1ff2150b9332433f32a24622147e5ebb1f26409d5da67afd479"
 
 [[package]]
 name = "version_check"
-version = "0.9.1"
+version = "0.9.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "078775d0255232fb988e6fccf26ddc9d1ac274299aaedcedce21c6f72cc533ce"
+checksum = "b5a972e5669d67ba988ce3dc826706fb0a8b01471c088cb0b6110b805cc36aed"
 
 [[package]]
 name = "winapi"

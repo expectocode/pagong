@@ -4,7 +4,7 @@ use crate::{AppError, Post, CSS_DIR_NAME, CSS_FILE_NAME, FOOTER_FILE_NAME, HEADE
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use atom_syndication::{ContentBuilder, EntryBuilder, FeedBuilder};
+use atom_syndication as atom;
 
 // // TODO we don't handle title and other metadata like tags
 // // TODO if we want to do this proper we should not put header inside main
@@ -174,26 +174,23 @@ impl Blog {
 
             entries.push(
                 // Additionally, we could add author or category information here
-                EntryBuilder::default()
-                    .title(post.title.clone())
-                    .id(post_path.to_string_lossy().to_string())
-                    .updated(chrono::DateTime::<chrono::FixedOffset>::from(
+                atom::Entry {
+                    title: post.title.clone(),
+                    id: post_path.to_string_lossy().to_string(),
+                    updated: chrono::DateTime::<chrono::FixedOffset>::from(
                         post.modified.and_hms(0, 0, 0),
-                    ))
-                    .published(chrono::DateTime::<chrono::FixedOffset>::from(
+                    ),
+                    published: Some(chrono::DateTime::<chrono::FixedOffset>::from(
                         post.created.and_hms(0, 0, 0),
-                    ))
-                    .summary(post.generate_summary())
-                    .content(
-                        ContentBuilder::default()
-                            .value(escaped_html)
-                            .src(post_path.to_string_lossy().to_string())
-                            .content_type("html".to_string())
-                            .build()
-                            .expect("Required content field missing"),
-                    )
-                    .build()
-                    .expect("Required entry field missing"),
+                    )),
+                    summary: post.generate_summary(),
+                    content: Some(atom::Content {
+                        value: Some(escaped_html),
+                        src: Some(post_path.to_string_lossy().to_string()),
+                        content_type: Some("html".to_string()),
+                    }),
+                    ..atom::Entry::default()
+                },
             );
 
             actions.push(FsAction::WriteFile {
@@ -237,18 +234,18 @@ impl Blog {
         // Similarly, we could add author, contributor, icon, or logo information here
         actions.push(FsAction::WriteFile {
             path: root.as_ref().join("atom.xml").into(),
-            content: FeedBuilder::default()
-                .title(blog_title.clone())
-                .id(blog_title)
-                .updated(if let Some(post) = sorted_posts.get(0) {
+            content: atom::Feed {
+                title: blog_title.clone(),
+                id: blog_title,
+                updated: if let Some(post) = sorted_posts.get(0) {
                     chrono::DateTime::<chrono::FixedOffset>::from(post.created.and_hms(0, 0, 0))
                 } else {
                     chrono::offset::Local::now().into()
-                })
-                .entries(entries)
-                .build()
-                .expect("Required feed field missing")
-                .to_string(),
+                },
+                entries,
+                ..atom::Feed::default()
+            }
+            .to_string(),
         });
 
         actions

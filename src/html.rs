@@ -314,8 +314,8 @@ where
                     let number = *self.numbers.entry(name.clone()).or_insert(len);
                     write!(
                         &mut self.writer,
-                        "<sup class=\"footnote-reference\" id=\"{}r\"><a href=\"#",
-                        number
+                        "<sup class=\"footnote-reference\" id=\"r.{}\"><a href=\"#f.",
+                        name
                     )?;
                     escape_html(&mut self.writer, &name)?;
                     self.write("\">")?;
@@ -491,9 +491,9 @@ where
             Tag::FootnoteDefinition(name) => {
                 self.inside_footnote_def = true;
                 if self.end_newline {
-                    self.write("<p class=\"footnote\" id=\"")?;
+                    self.write("<p class=\"footnote\" id=\"f.")?;
                 } else {
-                    self.write("\n<p class=\"footnote\" id=\"")?;
+                    self.write("\n<p class=\"footnote\" id=\"f.")?;
                 }
                 escape_html(&mut self.writer, &*name)?;
                 self.write("\"><sup>")?;
@@ -568,7 +568,7 @@ where
             Tag::Image(_, _, _) => (), // shouldn't happen, handled in start
             Tag::FootnoteDefinition(name) => {
                 self.inside_footnote_def = false;
-                write!(&mut self.writer, " <a href=\"#{}r\">↩</a></p>\n", name)?;
+                write!(&mut self.writer, " <a href=\"#r.{}\">↩</a></p>\n", name)?;
             }
         }
         Ok(())

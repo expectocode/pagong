@@ -89,7 +89,11 @@ impl Blog {
                 }
             }
 
-            posts.push(Post::from_source_file(path)?);
+            if let Some(ext) = path.extension() {
+                if ext.eq_ignore_ascii_case("md") {
+                    posts.push(Post::from_source_file(path)?);
+                }
+            }
         }
 
         Ok(Self {

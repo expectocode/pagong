@@ -5,6 +5,7 @@ use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::ops::Range;
 use std::path::{Path, PathBuf};
+use std::time::SystemTime;
 
 use chrono::offset::Local;
 use chrono::{Date, NaiveDate, TimeZone};
@@ -120,14 +121,12 @@ impl Post {
             source: e,
             path: post_path.clone(),
         })?;
-        let created = post_metadata.created().map_err(|e| AppError::FileMeta {
-            source: e,
-            path: post_path.clone(),
-        })?;
-        let modified = post_metadata.modified().map_err(|e| AppError::FileMeta {
-            source: e,
-            path: post_path.clone(),
-        })?;
+        let created = post_metadata
+            .created()
+            .unwrap_or_else(|_| SystemTime::now());
+        let modified = post_metadata
+            .modified()
+            .unwrap_or_else(|_| SystemTime::now());
 
         let created = chrono::DateTime::from(created).date();
         let modified = chrono::DateTime::from(modified).date();

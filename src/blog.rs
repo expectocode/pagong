@@ -89,13 +89,20 @@ impl Blog {
                 }
             }
 
-            if let Some(ext) = path.extension() {
-                // If it's not valid UTF-8 then it won't match "md" anyway
+            let ty = match child.file_type() {
+                Ok(ty) => ty,
+                Err(_) => continue,
+            };
+
+            if ty.is_dir() {
+                posts.push(Post::from_source_file(path)?);
+            } else if let Some(ext) = path.extension() {
                 if let Some(ext) = ext.to_str() {
                     if ext.eq_ignore_ascii_case("md") {
                         posts.push(Post::from_source_file(path)?);
                     }
                 }
+                // else if it's not valid UTF-8 then it won't match "md" anyway
             }
         }
 

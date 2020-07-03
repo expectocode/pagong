@@ -239,11 +239,14 @@ Modified {}</div>",
 
 /// Parse a string of the form YYYY-MM-DD into a "local" Date
 fn parse_date(date: &str) -> chrono::ParseResult<chrono::Date<Local>> {
-    NaiveDate::parse_from_str(date, "%Y-%m-%d").map(|date| {
-        TimeZone::from_local_date(&Local, &date)
-            .latest()
-            .expect("There should always be a latest date")
-    })
+    // ISO-format has priority
+    NaiveDate::parse_from_str(date, "%Y-%m-%dT%H:%M:%S%z")
+        .or_else(|_| NaiveDate::parse_from_str(date, "%Y-%m-%d"))
+        .map(|date| {
+            TimeZone::from_local_date(&Local, &date)
+                .latest()
+                .expect("There should always be a latest date")
+        })
 }
 
 #[cfg(test)]

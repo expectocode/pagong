@@ -1,8 +1,10 @@
 use crate::fs_action::{execute_fs_actions, FsAction};
-use crate::{AppError, Post, CSS_DIR_NAME, CSS_FILE_NAME, FOOTER_FILE_NAME, HEADER_FILE_NAME};
+use crate::{Post, CSS_DIR_NAME, CSS_FILE_NAME, FOOTER_FILE_NAME, HEADER_FILE_NAME};
 
 use std::fs;
 use std::path::{Path, PathBuf};
+
+use anyhow::{Context, Result};
 
 use atom_syndication as atom;
 
@@ -54,34 +56,34 @@ fn generate_post_html(post: &Post, header: &str, footer: &str, css: &str) -> Str
 }
 
 impl Blog {
-    pub fn from_source_dir<P: AsRef<Path>>(root: P) -> Result<Self, AppError> {
+    pub fn from_source_dir<P: AsRef<Path>>(root: P) -> Result<Self> {
         let mut posts = vec![];
         let mut header = None;
         let mut footer = None;
         let mut css_path = None;
+        let root = root.as_ref();
 
-        for child in fs::read_dir(root.as_ref()).map_err(|e| AppError::ReadDir {
-            source: e,
-            path: root.as_ref().into(),
-        })? {
-            let child = child.map_err(|e| AppError::IterDir {
-                source: e,
-                path: root.as_ref().into(),
-            })?;
+        for child in
+            fs::read_dir(root).context(format!("Could not read root directory '{:?}'", root))?
+        {
+            let child = child.context(format!(
+                "Could not list contents of root directory '{:?}'",
+                root
+            ))?;
             let path = child.path();
 
             if let Some(name) = path.file_name() {
                 if name == HEADER_FILE_NAME {
-                    header = Some(
-                        fs::read_to_string(&path)
-                            .map_err(|e| AppError::ReadFile { source: e, path })?,
-                    );
+                    header = Some(fs::read_to_string(&path).context(format!(
+                        "Could not read contents of header file '{:?}'",
+                        path
+                    ))?);
                     continue;
                 } else if name == FOOTER_FILE_NAME {
-                    footer = Some(
-                        fs::read_to_string(&path)
-                            .map_err(|e| AppError::ReadFile { source: e, path })?,
-                    );
+                    footer = Some(fs::read_to_string(&path).context(format!(
+                        "Could not read contents of footer file '{:?}'",
+                        path
+                    ))?);
                     continue;
                 } else if name == CSS_FILE_NAME {
                     css_path = Some(path.clone());
@@ -114,7 +116,7 @@ impl Blog {
         })
     }
 
-    pub fn generate<P: AsRef<Path>>(&self, root: P) -> Result<(), AppError> {
+    pub fn generate<P: AsRef<Path>>(&self, root: P) -> Result<()> {
         let actions = self.generate_actions(root);
         execute_fs_actions(&actions)
     }

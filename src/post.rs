@@ -1,4 +1,4 @@
-use crate::{html, AppError, FOLDER_POST_NAME};
+use crate::{html, FOLDER_POST_NAME};
 
 use pulldown_cmark::{CodeBlockKind, Event, Options, Parser, Tag};
 use std::ffi::{OsStr, OsString};
@@ -9,6 +9,8 @@ use std::time::SystemTime;
 
 use chrono::offset::Local;
 use chrono::{Date, NaiveDate, TimeZone};
+
+use anyhow::{Context, Result};
 
 #[derive(Debug, Clone)]
 pub struct Post {
@@ -103,7 +105,7 @@ impl Metadata {
 impl Post {
     /// Construct a post from a standalone title.md or a title/ directory
     /// containing a post.md and optional assets. Performs I/O.
-    pub fn from_source_file<P: AsRef<Path>>(path: P) -> Result<Self, AppError> {
+    pub fn from_source_file<P: AsRef<Path>>(path: P) -> Result<Self> {
         let post_path = if path.as_ref().is_file() {
             path.as_ref().to_path_buf()
         } else if path.as_ref().is_dir() {
@@ -112,15 +114,15 @@ impl Post {
             unreachable!("Followed symlink is not file or directory");
         };
 
-        let content = fs::read_to_string(&post_path).map_err(|e| AppError::ReadFile {
-            source: e,
-            path: post_path.clone(),
-        })?;
+        let content = fs::read_to_string(&post_path).context(format!(
+            "Could not read contents of post source file '{:?}'",
+            post_path,
+        ))?;
 
-        let post_metadata = post_path.metadata().map_err(|e| AppError::FileMeta {
-            source: e,
-            path: post_path.clone(),
-        })?;
+        let post_metadata = post_path.metadata().context(format!(
+            "Could not query metadata of post source file '{:?}'",
+            post_path
+        ))?;
         let created = post_metadata
             .created()
             .unwrap_or_else(|_| SystemTime::now());
@@ -132,15 +134,16 @@ impl Post {
         let modified = chrono::DateTime::from(modified).date();
 
         let mut assets = vec![];
-        if path.as_ref().is_dir() {
-            for child in fs::read_dir(path.as_ref()).map_err(|e| AppError::ReadDir {
-                source: e,
-                path: path.as_ref().into(),
-            })? {
-                let child = child.map_err(|e| AppError::IterDir {
-                    source: e,
-                    path: path.as_ref().into(),
-                })?;
+        let path = path.as_ref();
+        if path.is_dir() {
+            for child in
+                fs::read_dir(path).context(format!("Could not read post directory '{:?}'", path))?
+            {
+                let child = child.context(format!(
+                    "Could not list contents of post directory '{:?}'",
+                    path
+                ))?;
+
                 if child.path().extension() != Some(&OsStr::new("md")) {
                     // don't add .md files as assets
                     assets.push(child.path());
@@ -153,11 +156,7 @@ impl Post {
             assets,
             Metadata {
                 title: None,
-                path: path
-                    .as_ref()
-                    .file_stem()
-                    .expect("Post file must have stem")
-                    .into(),
+                path: path.file_stem().expect("Post file must have stem").into(),
                 modified,
                 created,
             },

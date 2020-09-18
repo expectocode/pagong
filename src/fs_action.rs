@@ -1,7 +1,7 @@
-use crate::AppError;
-
 use std::fs;
 use std::path::PathBuf;
+
+use anyhow::{anyhow, Context, Result};
 
 #[derive(Debug)]
 pub enum FsAction {
@@ -27,17 +27,14 @@ pub enum FsAction {
 }
 use FsAction::*;
 
-pub fn execute_fs_actions(actions: &[FsAction]) -> Result<(), AppError> {
+pub fn execute_fs_actions(actions: &[FsAction]) -> Result<()> {
     // This code is full of checks which are followed by actions, non-atomically.
     // This means that it's full of TOCTOU race conditions. I don't know how to avoid that.
     for action in actions {
         match action {
             Copy { source, dest } => {
-                fs::copy(source, dest).map_err(|e| AppError::CopyFile {
-                    source: e,
-                    src_path: source.into(),
-                    dst_path: dest.into(),
-                })?;
+                fs::copy(source, dest)
+                    .context(format!("Could not copy '{:?}' to '{:?}'", source, dest))?;
             }
             DeleteDir {
                 path,
@@ -47,59 +44,45 @@ pub fn execute_fs_actions(actions: &[FsAction]) -> Result<(), AppError> {
                 let should_fail_if_not_exists = !not_exists_ok;
                 if !path.exists() {
                     if should_fail_if_not_exists {
-                        return Err(AppError::DeleteFile {
-                            source: None,
-                            path: path.into(),
-                            reason: "there is nothing to delete",
-                        });
+                        return Err(anyhow!(
+                            "Path '{:?}' could not be deleted because it does not exist",
+                            path
+                        ));
                     }
                     continue;
                 }
                 if *recursive {
-                    fs::remove_dir_all(path).map_err(|e| AppError::DeleteDir {
-                        source: e,
-                        path: path.into(),
-                    })?;
+                    fs::remove_dir_all(path).context(format!(
+                        "Could not recursively delete directory '{:?}'",
+                        path
+                    ))?;
                 } else {
                     // Requires that the directory is empty
-                    fs::remove_dir(path).map_err(|e| AppError::DeleteDir {
-                        source: e,
-                        path: path.into(),
-                    })?;
+                    fs::remove_dir(path)
+                        .context(format!("Could not delete directory '{:?}'", path))?;
                 }
             }
             CreateDir { path, exists_ok } => {
                 if *exists_ok && path.exists() {
                     if !path.is_dir() {
-                        return Err(AppError::WriteDir {
-                            source: None,
-                            path: path.into(),
-                            reason: Some("a file already exists"),
-                        });
+                        return Err(anyhow!(
+                            "Could not create directory '{:?}': a file already exists",
+                            path
+                        ));
                     }
                     return Ok(());
                 }
-                fs::create_dir(path).map_err(|e| AppError::WriteDir {
-                    source: Some(e),
-                    path: path.into(),
-                    reason: None,
-                })?;
+                fs::create_dir(path).context(format!("Could not create directory '{:?}'", path))?;
             }
             WriteFile { path, content } => {
                 if path.exists() && !path.is_file() {
-                    return Err(AppError::WriteFile {
-                        source: None,
-                        path: path.into(),
-                        reason: Some("a directory already exists"),
-                    });
+                    return Err(anyhow!(
+                        "Could not write file '{:?}': a directory already exists"
+                    ));
                 }
 
                 // fs::write handles creation and truncation for us.
-                fs::write(path, content).map_err(|e| AppError::WriteFile {
-                    source: Some(e),
-                    path: path.into(),
-                    reason: None,
-                })?;
+                fs::write(path, content).context(format!("Could not write file '{:?}'", path))?;
             }
         }
     }

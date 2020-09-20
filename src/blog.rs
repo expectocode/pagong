@@ -19,7 +19,11 @@ pub struct Blog {
     pub footer: Option<String>,
 }
 
-fn generate_html(title: &str, css: &str, body_writer: &dyn Fn(&mut String)) -> String {
+fn generate_html(
+    title: &str,
+    css: &str,
+    body_writer: &dyn Fn(&mut String) -> Result<()>,
+) -> Result<String> {
     let mut html = String::new();
     html.push_str(
         r#"<!DOCTYPE html>
@@ -38,7 +42,7 @@ fn generate_html(title: &str, css: &str, body_writer: &dyn Fn(&mut String)) -> S
                  <main>\n",
     );
 
-    body_writer(&mut html);
+    body_writer(&mut html).context(format!("Body of post '{}' could not be written", title))?;
 
     html.push_str(
         "</main>\n\
@@ -46,10 +50,10 @@ fn generate_html(title: &str, css: &str, body_writer: &dyn Fn(&mut String)) -> S
                  </html>\n ",
     );
 
-    html
+    Ok(html)
 }
 
-fn generate_post_html(post: &Post, header: &str, footer: &str, css: &str) -> String {
+fn generate_post_html(post: &Post, header: &str, footer: &str, css: &str) -> Result<String> {
     generate_html(&post.title, css, &|html| {
         post.write_html(header, footer, html)
     })
@@ -117,11 +121,13 @@ impl Blog {
     }
 
     pub fn generate<P: AsRef<Path>>(&self, root: P) -> Result<()> {
-        let actions = self.generate_actions(root);
+        let actions = self
+            .generate_actions(root)
+            .context("Could not generate all blog information")?;
         execute_fs_actions(&actions)
     }
 
-    pub fn generate_actions<P: AsRef<Path>>(&self, root: P) -> Vec<FsAction> {
+    pub fn generate_actions<P: AsRef<Path>>(&self, root: P) -> Result<Vec<FsAction>> {
         let blog_title = "pagong".to_string(); // TODO user-provided
         let mut actions = vec![];
 
@@ -182,7 +188,10 @@ impl Blog {
             let css = format!("../{}/{}", CSS_DIR_NAME, CSS_FILE_NAME);
             let header = self.header.as_ref().map(|s| s.as_str()).unwrap_or("");
             let footer = self.footer.as_ref().map(|s| s.as_str()).unwrap_or("");
-            let html = generate_post_html(post, header, footer, &css);
+            let html = generate_post_html(post, header, footer, &css).context(format!(
+                "Could not generate HTML for post '{}', at path {:?}",
+                post.title, post.path
+            ))?;
 
             let mut escaped_html = String::with_capacity(html.len());
             crate::escape::escape_html(&mut escaped_html, &html)
@@ -242,8 +251,9 @@ impl Blog {
                         html.push_str("</a></li>");
                     });
                     html.push_str("</ul>");
+                    Ok(())
                 },
-            ),
+            )?,
         });
 
         // Generate atom feed
@@ -264,7 +274,7 @@ impl Blog {
             .to_string(),
         });
 
-        actions
+        Ok(actions)
     }
 }
 

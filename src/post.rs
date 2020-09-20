@@ -203,7 +203,7 @@ impl Post {
         })
     }
 
-    pub fn write_html(&self, header: &str, footer: &str, out: &mut String) {
+    pub fn write_html(&self, header: &str, footer: &str, out: &mut String) -> Result<()> {
         let date_format = "%Y-%m-%d";
         let date_divs = if self.modified == self.created {
             format!(
@@ -222,7 +222,9 @@ Modified {}</div>",
         // Insert date after first element (usually the title)
         let options = Options::all();
         let mut parser = Parser::new_ext(&self.markdown, options).into_offset_iter();
-        let (_, first_range) = parser.next().expect("Post must have at least one element");
+        let (_, first_range) = parser
+            .next()
+            .context("Post must contain at least one element")?;
         let main = self.markdown[first_range.clone()].to_string()
             + "\n"
             + &date_divs
@@ -233,6 +235,7 @@ Modified {}</div>",
 
         let parser = Parser::new_ext(&input, options);
         html::push_html(out, parser);
+        Ok(())
     }
 }
 

@@ -286,7 +286,7 @@ mod tests {
     use chrono::offset::Local;
 
     #[test]
-    fn css_file_copied() {
+    fn css_file_copied() -> Result<()> {
         let source_css_file = Path::new("path/to/content/").join(CSS_FILE_NAME);
         let root = Path::new("dist");
         let gen_css_dir = root.join(CSS_DIR_NAME);
@@ -298,7 +298,7 @@ mod tests {
             footer: None,
         };
 
-        let actions = blog.generate_actions(root);
+        let actions = blog.generate_actions(root)?;
 
         assert_eq!(actions.len(), 5);
         assert!(matches!(&actions[0] ,
@@ -336,10 +336,12 @@ mod tests {
                 content
             } if path == Path::new("dist/atom.xml") && content.contains("http://www.w3.org/2005/Atom")
         ));
+
+        Ok(())
     }
 
     #[test]
-    fn standalone_file_post_generated() {
+    fn standalone_file_post_generated() -> Result<()> {
         let blog = Blog {
             posts: vec![Post {
                 path: "test_post".into(),
@@ -354,7 +356,7 @@ mod tests {
             footer: None,
         };
 
-        let actions = blog.generate_actions("dist");
+        let actions = blog.generate_actions("dist")?;
 
         assert_eq!(actions.len(), 5);
         assert!(matches!(&actions[0] ,
@@ -392,5 +394,6 @@ mod tests {
                 content
             } if path == Path::new("dist/atom.xml") && content.contains("http://www.w3.org/2005/Atom")
         ));
+        Ok(())
     }
 }

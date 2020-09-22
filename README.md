@@ -100,7 +100,7 @@ The meta definitions are key-value pairs, separated by the `:` character, and th
 
 ### Naming convention
 
-The names for the metadata keys or classes to be used in the CSS should generally be the obvious thing you would expect.
+The names for the metadata keys or classes to be used in the CSS should generally be the obvious thing you would expect. Check the source code to be sure :)
 
 ## License
 

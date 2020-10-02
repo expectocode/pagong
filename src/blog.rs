@@ -128,13 +128,14 @@ impl Blog {
     }
 
     pub fn generate_actions<P: AsRef<Path>>(&self, root: P) -> Result<Vec<FsAction>> {
-        let blog_title = "pagong".to_string(); // TODO user-provided
+        let blog_root = "https://tanuj.dev/posts".to_string(); // TODO user-provided
+        let author_name = "Tanuj"; // TODO user-provided
+        let blog_title = "tan's posts"; // TODO user-provided
         let mut actions = vec![];
 
         // Copy CSS assets
         if let Some(css_source) = &self.css_path {
             let css_path = root.as_ref().join(CSS_DIR_NAME);
-
             actions.push(FsAction::DeleteDir {
                 path: css_path.clone(),
                 not_exists_ok: true,
@@ -198,10 +199,14 @@ impl Blog {
                 .expect("Escaping HTML in-memory failed");
 
             entries.push(
-                // Additionally, we could add author or category information here
+                // Additionally, we could add category or other extra information here
                 atom::Entry {
                     title: post.title.clone(),
-                    id: post_path.to_string_lossy().to_string(),
+                    id: PathBuf::from(&blog_root)
+                        .join(post_dir_name)
+                        .join("index.html")
+                        .to_string_lossy()
+                        .to_string(),
                     updated: chrono::DateTime::<chrono::FixedOffset>::from(
                         post.modified.and_hms(0, 0, 0),
                     ),
@@ -211,9 +216,13 @@ impl Blog {
                     summary: post.generate_summary(),
                     content: Some(atom::Content {
                         value: Some(escaped_html),
-                        src: Some(post_path.to_string_lossy().to_string()),
+                        src: None,
                         content_type: Some("html".to_string()),
                     }),
+                    authors: vec![atom::Person {
+                        name: author_name.into(),
+                        ..atom::Person::default()
+                    }],
                     ..atom::Entry::default()
                 },
             );
@@ -237,7 +246,7 @@ impl Blog {
         actions.push(FsAction::WriteFile {
             path: root.as_ref().join("index.html").into(),
             content: generate_html(
-                &blog_title,
+                blog_title,
                 &format!("{}/{}", CSS_DIR_NAME, CSS_FILE_NAME),
                 &|mut html| {
                     html.push_str("<ul>");
@@ -261,14 +270,22 @@ impl Blog {
         actions.push(FsAction::WriteFile {
             path: root.as_ref().join("atom.xml").into(),
             content: atom::Feed {
-                title: blog_title.clone(),
-                id: blog_title,
+                title: "BLOG TITLE TODO".into(),
+                id: blog_root.clone(),
                 updated: if let Some(post) = sorted_posts.get(0) {
                     chrono::DateTime::<chrono::FixedOffset>::from(post.created.and_hms(0, 0, 0))
                 } else {
                     chrono::offset::Local::now().into()
                 },
                 entries,
+                links: vec![atom::Link {
+                    rel: "self".into(),
+                    href: PathBuf::from(&blog_root)
+                        .join("atom.xml")
+                        .to_string_lossy()
+                        .into(),
+                    ..atom::Link::default()
+                }],
                 ..atom::Feed::default()
             }
             .to_string(),

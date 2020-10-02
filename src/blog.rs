@@ -128,9 +128,9 @@ impl Blog {
     }
 
     pub fn generate_actions<P: AsRef<Path>>(&self, root: P) -> Result<Vec<FsAction>> {
-        let blog_root = "https://tanuj.dev/posts".to_string(); // TODO user-provided
-        let author_name = "Tanuj"; // TODO user-provided
-        let blog_title = "tan's posts"; // TODO user-provided
+        let blog_root = "https://expectocode.github.io/pagong".to_string(); // TODO user-provided
+        let author_name = "expectocode"; // TODO user-provided
+        let blog_title = "pagong"; // TODO user-provided
         let mut actions = vec![];
 
         // Copy CSS assets
@@ -202,6 +202,7 @@ impl Blog {
                 // Additionally, we could add category or other extra information here
                 atom::Entry {
                     title: post.title.clone(),
+                    // `id` fields on entries are required to be complete URLs.
                     id: PathBuf::from(&blog_root)
                         .join(post_dir_name)
                         .join("index.html")
@@ -266,11 +267,13 @@ impl Blog {
         });
 
         // Generate atom feed
-        // Similarly, we could add author, contributor, icon, or logo information here
+        // Similarly, we could add author, contributor, icon, or logo information here.
+        // TODO: It would be nice to automatically test validity against the Atom schema,
+        // to ensure the best support by feed readers.
         actions.push(FsAction::WriteFile {
             path: root.as_ref().join("atom.xml").into(),
             content: atom::Feed {
-                title: "BLOG TITLE TODO".into(),
+                title: blog_title.into(),
                 id: blog_root.clone(),
                 updated: if let Some(post) = sorted_posts.get(0) {
                     chrono::DateTime::<chrono::FixedOffset>::from(post.created.and_hms(0, 0, 0))

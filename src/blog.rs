@@ -187,8 +187,8 @@ impl Blog {
 
             // TODO this looks like a bad way to handle the path to the css
             let css = format!("../{}/{}", CSS_DIR_NAME, CSS_FILE_NAME);
-            let header = self.header.as_ref().map(|s| s.as_str()).unwrap_or("");
-            let footer = self.footer.as_ref().map(|s| s.as_str()).unwrap_or("");
+            let header = self.header.as_deref().unwrap_or("");
+            let footer = self.footer.as_deref().unwrap_or("");
             let html = generate_post_html(post, header, footer, &css).context(format!(
                 "Could not generate HTML for post '{}', at path {:?}",
                 post.title, post.path
@@ -245,7 +245,7 @@ impl Blog {
 
         // Generate main-page listing
         actions.push(FsAction::WriteFile {
-            path: root.as_ref().join("index.html").into(),
+            path: root.as_ref().join("index.html"),
             content: generate_html(
                 blog_title,
                 &format!("{}/{}", CSS_DIR_NAME, CSS_FILE_NAME),
@@ -271,7 +271,7 @@ impl Blog {
         // TODO: It would be nice to automatically test validity against the Atom schema,
         // to ensure the best support by feed readers.
         actions.push(FsAction::WriteFile {
-            path: root.as_ref().join("atom.xml").into(),
+            path: root.as_ref().join("atom.xml"),
             content: atom::Feed {
                 title: blog_title.into(),
                 id: blog_root.clone(),

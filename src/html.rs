@@ -568,7 +568,7 @@ where
             Tag::Image(_, _, _) => (), // shouldn't happen, handled in start
             Tag::FootnoteDefinition(name) => {
                 self.inside_footnote_def = false;
-                write!(&mut self.writer, " <a href=\"#r.{}\">↩</a></p>\n", name)?;
+                write!(&mut self.writer, " <a href=\"#r.{}\">↩</a></p>", name)?;
             }
         }
         Ok(())

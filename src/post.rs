@@ -205,34 +205,34 @@ impl Post {
 
     pub fn write_html(&self, header: &str, footer: &str, out: &mut String) -> Result<()> {
         let date_format = "%Y-%m-%d";
-        let date_divs = if self.modified == self.created {
-            format!(
-                "<div class=\"date-created-modified\">{}</div>",
-                self.created.format(date_format)
-            )
-        } else {
-            format!(
-                "<div class=\"date-created-modified\">Created {}<br>
-Modified {}</div>",
-                self.created.format(date_format),
-                self.modified.format(date_format)
-            )
-        };
+        let create_date_div = format!(
+            "<div class=\"date-created-modified\">{}</div>\n",
+            self.created.format(date_format)
+        );
 
-        // Insert date after first element (usually the title)
+        // Insert creation date after first element (usually the title)
         let options = Options::all();
         let mut parser = Parser::new_ext(&self.markdown, options).into_offset_iter();
         let (_, first_range) = parser
             .next()
             .context("Post must contain at least one element")?;
-        let main = self.markdown[first_range.clone()].to_string()
+        let mut main = self.markdown[first_range.clone()].to_string()
             + "\n"
-            + &date_divs
+            + &create_date_div
             + "\n"
             + &self.markdown[first_range.end..];
 
-        let input = header.to_string() + "\n" + &main + "\n" + footer;
+        if self.modified != self.created {
+            // This needs to start with a newline or it might get bundled with the previous
+            // tag
+            main.push_str(&format!(
+                "\n<div class=\"date-created-modified\">
+Last edited {}</div>\n",
+                self.modified.format(date_format)
+            ))
+        };
 
+        let input = header.to_string() + "\n" + &main + "\n" + footer;
         let parser = Parser::new_ext(&input, options);
         html::push_html(out, parser);
         Ok(())

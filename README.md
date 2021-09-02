@@ -1,8 +1,8 @@
 # Pagong ![pagong's logo](logo.svg)
 
-> *Write markdown, get a static site*
+> *Boring-simple Static-Site-Generator*
 
-This project is a bit of a work in progress. Expect more nice things to come!
+You want a website but writing HTML by hand is awful. I get it. But that's no problem! Write markdown at your leisure, run `pagong` and get your nice HTML lightning fast, ready to be uploaded to your hosting service!
 
 ## Getting started
 
@@ -29,8 +29,7 @@ For `pagong` to do anything useful, you need to have some entries for your blog.
 ```
 myblog/
 └── content/
-    ├── hello-world.md
-    └── style.css
+    └── hello-world.md
 ```
 
 Running `pagong` while inside `myblog` will create the following `dist/` folder, and the tree of your blog now looks like this:
@@ -38,69 +37,94 @@ Running `pagong` while inside `myblog` will create the following `dist/` folder,
 ```
 myblog/
 ├── content/
-│   ├── hello-world.md
-│   └── style.css
+│   └── hello-world.md
 └── dist/
-    ├── atom.xml
-    ├── css/
-    │   └── style.css
-    ├── hello-world/
-    │   └── index.html
-    └── index.html
+    └── hello-world/
+        └── index.html
 ```
 
 Now you can move the contents of `dist/` to wherever you host your site and enjoy it.
 
-### Styling
-
-We provide a [default `style.css`](https://raw.githubusercontent.com/expectocode/pagong/master/style.css) that you need to copy into your `content/` folder if you want your blog to look pretty. This is completely optional, and you can also write your own if you want.
-
 ## Customization
 
-### Assets
+### Metadata
 
-If you want to embed assets into your blog entries, create a directory for the entry instead, and put the text contents inside `post.md`. Then, include any assets you want in the same folder:
+Your `.md` files may contain the following syntax at the very top:
+
+```
++++
+key = value
++++
+
+**Markdown** content follows as usual…
+```
+
+The `+++` must appear on their own line with no spaces around them. The supported keys are:
+
+* `title`: Post title (e.g. "Hello, world!").
+* `date`: Published date, `YYYY-MM-DD` (Year, Month, Day) format (e.g. "2020-02-20").
+* `updated`: Updated date, `YYYY-MM-DD` format.
+* `category`: Category where the post belongs to (e.g. "computing").
+* `tags`: Comma-separated list of tags (e.g. "rust, ssg").
+* `template`: Path to the HTML file to be used as the template for this file, UNIX-style path, relative wherever the current file is (e.g. "/_blog.html" or "../_template.html").
+
+Any other key will be ignored by `pagong`, but may be used for your own needs.
+
+If leading or trailing whitespace matters for a value, surround the value in double-quotes (`"`). Quoted values may span multiple lines. The only escape sequences allowed inside double-quotes are `\"` in order to escape a quote, and `\\` in order to escape the backslash character. Any other escape sequence will produce an error.
+
+### CSS
+
+Any `.css` file will be copied to `dist/`, and any `.md` will load all the `.css` files in the same directory or above.
 
 ```
 myblog/
-└── content
-    └── hello-world
-        ├── asset.jpg
-        └── post.md
+└── content/
+    ├── index.md
+    ├── sitewide.css
+    └── blog/
+        ├── hello-world.md
+        └── blogwide.css
 ```
 
-Inside `post.md`, you can simply refer to `asset.jpg` to make use of it:
+The HTML generated for `index.md` will use `sitewide.css`, and the HTML generated for `hello-world.md` will include `sitewide.css` and then `blogwide.css`.
 
-```md
-# Hello, world!
+### HTML
 
-![A beautiful asset.](asset.jpg)
+Any `.html` file will be copied to `dist/` as-is, with the exception files mentioned in the metadata of any of the `.md` files. If `hello-world.md` includes `template = /templates/base.html`, then `base.html` won't be copied over as-is, and instead, it will be used as a template. You're encouraged to follow your own convention as to where to place the templates or how they should be named.
+
+HTML files used as templates offer some very minimal "pre-processor" rules, which are HTML comments with a few adornments:
+
+```html
+This comment will tell pagong to insert references to any CSS files in this spot:
+<!--P/ CSS /P-->
+
+This comment will tell pagong to automatically generate a Table of Contents for the current page (based on Markdown headings). You may optionally set the maximum depth:
+<!--P/ TOC /P-->
+<!--P/ TOC depth 3 /P-->
+
+This comment will tell pagong to automatically generate a list of files in the given path (relative to the current HTML template file):
+<!--P/ LIST path /P-->
+
+This comment will get replaced with whatever was put in the specified metadata key (in this example, the title):
+<!--P/ META title /P-->
+
+This comment will get replaced with the contents of whatever path is specified (relative to the current HTML template file):
+<!--P/ INCLUDE path /P-->
 ```
 
-### Post metadata
+When replacing the "pre-processor" rules, the code will look exactly for the strings `<!--P/` and `/P-->`, so make sure to not introduce spaces in-between. If any of the values to the pre-processor rules contain spaces, surround them in double-quotes (`"`). The rules are the same as they were for the metadata values. HTML files *not* used as templates will not have this replacement enabled.
 
-Post metadata is included within the `.md` itself as a fenced block with the `"meta"` language at the beginning of the post's content. This code block won't be directly visible in the generated HTML, but will instruct `pagong` how to do certain things. For example, in `post.md`:
+### Feed
 
-<pre>
-```meta
-created: 2020-02-20
-```
+Any `.atom` file will be copied to `dist/`, but filled with the entries at the same level.
 
-# My blog post
+### Media
 
-Welcome!
-</pre>
+Any other file will be copied over without any processing done to it, with the same path and name as it existed in the `content/` directory.
 
-The meta definitions are key-value pairs, separated by the `:` character, and the valid keys are:
+## Contributing
 
-* `created` or `published`: overrides the creation date of the entry, in `YYYY-mm-dd` format.
-* `modified` or `updated`: overrides the date of the last update of the entry, in `YYYY-mm-dd` format.
-* `title`: overrides the title of the post.
-* `path`: overrides the path of the post (so that the URL can be different from the file name).
-
-### Naming convention
-
-The names for the metadata keys or classes to be used in the CSS should generally be the obvious thing you would expect. Check the source code to be sure :)
+The number of features this project offers is intentionally small. Issues and pull requests regarding bugs or possible enhancements are welcome. New features or substantial changes must first be discussed in the issues section. Pull requests of new features without previous discussion will be rejected, but you are welcome to maintain your own fork.
 
 ## License
 

@@ -70,8 +70,6 @@ The `+++` must appear on their own line with no spaces around them. The supporte
 
 Any other key will be ignored by `pagong`, but may be used for your own needs.
 
-If leading or trailing whitespace matters for a value, surround the value in double-quotes (`"`). Quoted values may span multiple lines. The only escape sequences allowed inside double-quotes are `\"` in order to escape a quote, and `\\` in order to escape the backslash character. Any other escape sequence will produce an error.
-
 ### CSS
 
 Any `.css` file will be copied to `dist/`, and any `.md` will load all the `.css` files in the same directory or above.
@@ -95,6 +93,9 @@ Any `.html` file will be copied to `dist/` as-is, with the exception files menti
 HTML files used as templates offer some very minimal "pre-processor" rules, which are HTML comments with a few adornments:
 
 ```html
+This comment will tell pagong to insert the generated HTML in this spot:
+<!--P/ CONTENTS /P-->
+
 This comment will tell pagong to insert references to any CSS files in this spot:
 <!--P/ CSS /P-->
 
@@ -112,7 +113,7 @@ This comment will get replaced with the contents of whatever path is specified (
 <!--P/ INCLUDE path /P-->
 ```
 
-When replacing the "pre-processor" rules, the code will look exactly for the strings `<!--P/` and `/P-->`, so make sure to not introduce spaces in-between. If any of the values to the pre-processor rules contain spaces, surround them in double-quotes (`"`). The rules are the same as they were for the metadata values. HTML files *not* used as templates will not have this replacement enabled.
+When replacing the "pre-processor" rules, the code will look exactly for the strings `<!--P/` and `/P-->`, so make sure to not introduce spaces in-between. If any of the values to the pre-processor rules contain spaces, surround them in double-quotes (`"`). The only escape sequences allowed inside double-quotes are `\"` in order to escape a quote, and `\\` in order to escape the backslash character.
 
 ### Feed
 

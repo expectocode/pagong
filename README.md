@@ -101,7 +101,7 @@ This comment will tell pagong to insert references to any CSS files in this spot
 
 This comment will tell pagong to automatically generate a Table of Contents for the current page (based on Markdown headings). You may optionally set the maximum depth:
 <!--P/ TOC /P-->
-<!--P/ TOC depth 3 /P-->
+<!--P/ TOC 3 /P-->
 
 This comment will tell pagong to automatically generate a list of files in the given path (relative to the current HTML template file):
 <!--P/ LIST path /P-->

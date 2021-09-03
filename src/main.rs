@@ -10,6 +10,9 @@ use std::time::UNIX_EPOCH;
 pub const SOURCE_PATH: &str = "content";
 pub const TARGET_PATH: &str = "dist";
 pub const DATE_FMT: &str = "%Y-%m-%d";
+pub const TEMPLATE_OPEN_MARKER: &str = "<!--P/";
+pub const TEMPLATE_CLOSE_MARKER: &str = "/P-->";
+pub const DEFAULT_HTML_TEMPLATE: &str = std::include_str!("../template.html");
 
 struct MdFile {
     path: PathBuf,
@@ -38,7 +41,6 @@ struct Replacement {
 }
 
 struct HtmlTemplate {
-    path: Option<PathBuf>,
     replacements: Vec<Replacement>,
 }
 
@@ -54,9 +56,89 @@ struct Scan {
     /// CSS files found.
     css_files: Vec<PathBuf>,
     /// HTML templates found.
-    html_templates: HashSet<HtmlTemplate>,
+    html_templates: HashMap<PathBuf, HtmlTemplate>,
+    /// HTML template to use when no other file can be used.
+    default_template: HtmlTemplate,
     /// Markdown files to parse and generate HTML from.
     md_files: Vec<MdFile>,
+}
+
+/// Parses the next value in the given string. `value` is left at the next value. Parsed value is returned.
+fn parse_next_value(string: &mut &str) -> Option<String> {
+    let bytes = string.as_bytes();
+
+    let mut offset = 0;
+    while offset < bytes.len() {
+        if bytes[offset].is_ascii_whitespace() {
+            offset += 1;
+        } else {
+            break;
+        }
+    }
+
+    if offset == bytes.len() {
+        *string = &string[offset..];
+        return None;
+    }
+
+    let (value, end_offset) = if bytes[offset] == b'"' {
+        let mut value = Vec::with_capacity(bytes.len() - offset);
+        let mut escape = false;
+        let mut index = offset + 1;
+        let mut closed = false;
+        while index < bytes.len() {
+            if escape {
+                value.push(bytes[index]);
+                escape = false;
+            } else {
+                if bytes[index] == b'\\' {
+                    escape = true;
+                } else if bytes[index] == b'"' {
+                    closed = true;
+                    index += 1;
+                    break;
+                } else {
+                    value.push(bytes[index]);
+                }
+            }
+            index += 1;
+        }
+        if escape {
+            eprintln!(
+                "note: reached end of string with escape sequence open: {:?}",
+                string
+            );
+        }
+        if !closed {
+            eprintln!(
+                "note: reached end of string without closing it: {:?}",
+                string
+            );
+        }
+        (value, index)
+    } else {
+        let end_offset = match bytes[offset..].iter().position(|b| b.is_ascii_whitespace()) {
+            Some(i) => offset + i,
+            None => bytes.len(),
+        };
+        (bytes[offset..end_offset].to_vec(), end_offset)
+    };
+
+    *string = &string[end_offset..];
+    String::from_utf8(value).ok()
+}
+
+/// Get the absolute path out of value given the root and the path of the file being processed.
+fn get_abs_path(root: &PathBuf, path: Option<&PathBuf>, value: &str) -> PathBuf {
+    if value.starts_with('/') {
+        let mut p = root.clone();
+        p.push(&value[1..]);
+        p
+    } else {
+        let mut p = path.unwrap_or(root).clone();
+        p.push(value);
+        p
+    }
 }
 
 fn parse_opt_date(path: &PathBuf, created: bool, string: Option<&String>) -> NaiveDate {
@@ -148,21 +230,92 @@ impl MdFile {
                 Some(s) => s.split(',').map(|s| s.trim().to_owned()).collect(),
                 None => Vec::new(),
             },
-            template: meta.get("template").map(|s| {
-                if s.starts_with('/') {
-                    let mut p = root.clone();
-                    p.push(&s[1..]);
-                    p
-                } else {
-                    let mut p = path.clone();
-                    p.push(s);
-                    p
-                }
-            }),
+            template: meta
+                .get("template")
+                .map(|s| get_abs_path(&root, Some(&path), s)),
             path,
             meta,
             md_offset,
         })
+    }
+}
+
+impl PreprocessorRule {
+    fn new(root: &PathBuf, path: Option<&PathBuf>, mut string: &str) -> Option<Self> {
+        let parsing = &mut string;
+        let rule = parse_next_value(parsing)?;
+        Some(match rule.as_str() {
+            "CONTENTS" => PreprocessorRule::Contents,
+            "CSS" => PreprocessorRule::Css,
+            "TOC" => {
+                let depth = match parse_next_value(parsing) {
+                    Some(value) => match value.parse() {
+                        Ok(depth) => depth,
+                        Err(_) => {
+                            eprintln!("note: could not parse depth as a number: {}", string);
+                            u8::MAX
+                        }
+                    },
+                    None => u8::MAX,
+                };
+                PreprocessorRule::Toc { depth }
+            }
+            "LIST" => {
+                let path = get_abs_path(root, path, &parse_next_value(parsing)?);
+                PreprocessorRule::Listing { path }
+            }
+            "META" => {
+                let key = parse_next_value(parsing)?;
+                PreprocessorRule::Meta { key }
+            }
+            "INCLUDE" => {
+                let path = get_abs_path(root, path, &parse_next_value(parsing)?);
+                PreprocessorRule::Include { path }
+            }
+            _ => return None,
+        })
+    }
+}
+
+impl HtmlTemplate {
+    fn load(root: &PathBuf, path: &PathBuf) -> io::Result<Self> {
+        let contents = fs::read_to_string(&path)?;
+        Ok(Self::new(root, Some(path), contents))
+    }
+
+    fn new(root: &PathBuf, path: Option<&PathBuf>, contents: String) -> Self {
+        let mut replacements = Vec::new();
+        let mut offset = 0;
+        while let Some(index) = contents[offset..].find(TEMPLATE_OPEN_MARKER) {
+            let rule_start = offset + index + TEMPLATE_OPEN_MARKER.len();
+            let rule_end = match contents[rule_start..].find(TEMPLATE_CLOSE_MARKER) {
+                Some(i) => rule_start + i,
+                None => {
+                    eprintln!(
+                        "note: html template without close marker after byte offset {}: {:?}",
+                        rule_start, path
+                    );
+                    break;
+                }
+            };
+
+            let rule = &contents[rule_start..rule_end];
+            match PreprocessorRule::new(root, path, rule) {
+                Some(rule) => replacements.push(Replacement {
+                    range: (offset + index)..(rule_end + TEMPLATE_CLOSE_MARKER.len()),
+                    rule,
+                }),
+                None => {
+                    eprint!(
+                        "note: could not understand preprocessor rule {}: {:?}",
+                        rule, path
+                    );
+                }
+            }
+
+            offset = rule_end + TEMPLATE_CLOSE_MARKER.len();
+        }
+        Self { replacements }
     }
 }
 
@@ -177,14 +330,15 @@ impl Scan {
     /// The second stage:
     ///
     /// * Removes the HTML templates from the files that need copying.
-    fn new(src: PathBuf, dst: PathBuf) -> io::Result<Self> {
+    fn new(root: PathBuf, dst: PathBuf) -> io::Result<Self> {
         let mut scan = Scan {
-            source: src,
+            source: root.clone(),
             destination: dst,
             dirs_to_create: Vec::new(),
             files_to_copy: Vec::new(),
             css_files: Vec::new(),
-            html_templates: HashSet::new(),
+            html_templates: HashMap::new(),
+            default_template: HtmlTemplate::new(&root, None, DEFAULT_HTML_TEMPLATE.to_owned()),
             md_files: Vec::new(),
         };
         let mut templates = HashSet::new();
@@ -227,8 +381,18 @@ impl Scan {
         }
 
         // Removes the HTML templates from the files that need copying.
-        scan.files_to_copy
-            .retain(|path| templates.contains(path));
+        scan.files_to_copy.retain(|path| templates.contains(path));
+
+        // Parse templates.
+        scan.html_templates.extend(templates.into_iter().filter_map(
+            |path| match HtmlTemplate::load(&root, &path) {
+                Ok(template) => Some((path, template)),
+                Err(_) => {
+                    eprintln!("note: failed to parse html template: {:?}", path);
+                    None
+                }
+            },
+        ));
 
         Ok(scan)
     }
@@ -258,4 +422,61 @@ fn main() -> io::Result<()> {
     Scan::new(content, dist)?.execute()?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod parse_value {
+        use super::*;
+
+        #[test]
+        fn simple() {
+            let mut string = "simple";
+            assert_eq!(parse_next_value(&mut string), Some("simple".to_owned()));
+        }
+
+        #[test]
+        fn quoted() {
+            let mut string = "\"quoted\"";
+            assert_eq!(parse_next_value(&mut string), Some("quoted".to_owned()));
+        }
+
+        #[test]
+        fn good_escape() {
+            let mut string = "\"good\\\" \\\"escape\"";
+            assert_eq!(
+                parse_next_value(&mut string),
+                Some("good\" \"escape".to_owned())
+            );
+        }
+
+        #[test]
+        fn bad_escape() {
+            let mut string = "\"bad\\_escape\"";
+            assert_eq!(parse_next_value(&mut string), Some("bad_escape".to_owned()));
+        }
+
+        #[test]
+        fn unterminated() {
+            let mut string = "\"unterminated";
+            assert_eq!(
+                parse_next_value(&mut string),
+                Some("unterminated".to_owned())
+            );
+        }
+
+        #[test]
+        fn multiple() {
+            let mut string = " simple \t\"quoted\" \n \"\\\"escapes\\\\\" \n\t \r simple";
+            let string = &mut string;
+            let mut values = Vec::new();
+            while let Some(value) = parse_next_value(string) {
+                values.push(value);
+            }
+
+            assert_eq!(values, vec!["simple", "quoted", "\"escapes\\", "simple"]);
+        }
+    }
 }

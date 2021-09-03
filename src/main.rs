@@ -1,15 +1,24 @@
-use std::collections::{HashSet, HashMap};
+use chrono::{NaiveDate, NaiveDateTime};
+use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::io;
 use std::ops::Range;
 use std::path::PathBuf;
+use std::time::UNIX_EPOCH;
 
 pub const SOURCE_PATH: &str = "content";
 pub const TARGET_PATH: &str = "dist";
+pub const DATE_FMT: &str = "%Y-%m-%d";
 
 struct MdFile {
     path: PathBuf,
+    title: String,
+    date: NaiveDate,
+    updated: NaiveDate,
+    category: Option<String>,
+    tags: Vec<String>,
+    template: Option<PathBuf>,
     meta: HashMap<String, String>,
     md_offset: usize,
 }
@@ -50,8 +59,52 @@ struct Scan {
     md_files: Vec<MdFile>,
 }
 
+fn parse_opt_date(path: &PathBuf, created: bool, string: Option<&String>) -> NaiveDate {
+    match string {
+        Some(s) => match NaiveDate::parse_from_str(s, DATE_FMT) {
+            Ok(d) => return d,
+            Err(_) => eprintln!("note: invalid date value: {:?}", s),
+        },
+        None => {}
+    }
+
+    match fs::metadata(&path) {
+        Ok(meta) => {
+            if created {
+                match meta.created() {
+                    Ok(date) => {
+                        return NaiveDateTime::from_timestamp(
+                            date.duration_since(UNIX_EPOCH).unwrap().as_secs() as i64,
+                            0,
+                        )
+                        .date()
+                    }
+                    Err(_) => eprintln!("note: failed to fetch creation date for file: {:?}", path),
+                }
+            } else {
+                match meta.modified() {
+                    Ok(date) => {
+                        return NaiveDateTime::from_timestamp(
+                            date.duration_since(UNIX_EPOCH).unwrap().as_secs() as i64,
+                            0,
+                        )
+                        .date()
+                    }
+                    Err(_) => eprintln!(
+                        "note: failed to fetch modification date for file: {:?}",
+                        path
+                    ),
+                }
+            }
+        }
+        Err(_) => eprintln!("note: failed to fetch metadata for file: {:?}", path),
+    }
+
+    chrono::Local::today().naive_local()
+}
+
 impl MdFile {
-    pub fn new(path: PathBuf) -> io::Result<Self> {
+    pub fn new(root: &PathBuf, path: PathBuf) -> io::Result<Self> {
         let mut meta = HashMap::new();
         let mut md_offset = 0;
 
@@ -84,6 +137,28 @@ impl MdFile {
         }
 
         Ok(MdFile {
+            title: match meta.get("title") {
+                Some(s) => s.to_owned(),
+                None => path.file_name().unwrap().to_str().unwrap().to_owned(),
+            },
+            date: parse_opt_date(&path, true, meta.get("date")),
+            updated: parse_opt_date(&path, false, meta.get("updated")),
+            category: meta.get("category").cloned(),
+            tags: match meta.get("tags") {
+                Some(s) => s.split(',').map(|s| s.trim().to_owned()).collect(),
+                None => Vec::new(),
+            },
+            template: meta.get("template").map(|s| {
+                if s.starts_with('/') {
+                    let mut p = root.clone();
+                    p.push(&s[1..]);
+                    p
+                } else {
+                    let mut p = path.clone();
+                    p.push(s);
+                    p
+                }
+            }),
             path,
             meta,
             md_offset,
@@ -141,9 +216,8 @@ impl Scan {
                         scan.files_to_copy.push(entry.path());
                     } else {
                         // Parses all MD files.
-                        let md = MdFile::new(entry.path())?;
-                        if let Some(template) = md.meta.get("template") {
-                            // TOOD turn into absolute path
+                        let md = MdFile::new(&scan.source, entry.path())?;
+                        if let Some(template) = md.template.as_ref() {
                             templates.insert(template.clone());
                         }
                         scan.md_files.push(md);
@@ -153,7 +227,8 @@ impl Scan {
         }
 
         // Removes the HTML templates from the files that need copying.
-        scan.files_to_copy.retain(|path| templates.contains(path.to_str().unwrap()));
+        scan.files_to_copy
+            .retain(|path| templates.contains(path));
 
         Ok(scan)
     }

@@ -26,6 +26,7 @@ struct MdFile {
     md_offset: usize,
 }
 
+#[derive(Clone)]
 enum PreprocessorRule {
     Contents,
     Css,
@@ -35,6 +36,7 @@ enum PreprocessorRule {
     Include { path: PathBuf },
 }
 
+#[derive(Clone)]
 struct Replacement {
     range: Range<usize>,
     rule: PreprocessorRule,
@@ -139,6 +141,17 @@ fn get_abs_path(root: &PathBuf, path: Option<&PathBuf>, value: &str) -> PathBuf 
         p.push(value);
         p
     }
+}
+
+/// Replace's `path`'s `source` root with `destination`. Panics if `path` does not start with `source`.
+///
+/// Rust's path (and `OsString`) manipulation is pretty lacking, so the method falls back to `String`.
+fn replace_root(source: &String, destination: &String, path: &String) -> PathBuf {
+    assert!(path.starts_with(source));
+    let rel = &path[source.len() + 1..]; // +1 to skip path separator
+    let mut dir = PathBuf::from(&destination);
+    dir.push(rel);
+    dir
 }
 
 fn parse_opt_date(path: &PathBuf, created: bool, string: Option<&String>) -> NaiveDate {
@@ -317,6 +330,35 @@ impl HtmlTemplate {
         }
         Self { replacements }
     }
+
+    fn apply(&self, html: &String, md: MdFile) -> io::Result<String> {
+        let mut result = html.clone();
+        let mut replacements = self.replacements.clone();
+        replacements.sort_by_key(|r| r.range.start);
+
+        for replacement in replacements.into_iter().rev() {
+            let value = match replacement.rule {
+                PreprocessorRule::Contents => fs::read_to_string(&md.path)?,
+                PreprocessorRule::Css => {
+                    todo!("determine all css that apply")
+                }
+                PreprocessorRule::Toc { depth: _ } => {
+                    todo!("determine toc from md")
+                }
+                PreprocessorRule::Listing { path: _ } => {
+                    todo!("list all files")
+                }
+                PreprocessorRule::Meta { key } => {
+                    md.meta.get(&key).cloned().unwrap_or_else(String::new)
+                }
+                PreprocessorRule::Include { path } => fs::read_to_string(path)?,
+            };
+
+            result.replace_range(replacement.range, &value);
+        }
+
+        Ok(result)
+    }
 }
 
 impl Scan {
@@ -403,7 +445,60 @@ impl Scan {
     /// * Copies all files that need copying.
     /// * Converts every MD file to HTML and places it in the destination.
     fn execute(self) -> io::Result<()> {
-        todo!()
+        let source = self
+            .source
+            .into_os_string()
+            .into_string()
+            .expect("bad source path");
+
+        let destination = self
+            .destination
+            .into_os_string()
+            .into_string()
+            .expect("bad destination path");
+
+        // Creates all directories that need creating.
+        for dir in self.dirs_to_create {
+            // Replace dir's prefix (source) with destination.
+            let dir = dir.into_os_string().into_string().expect("bad dir path");
+            let dir = replace_root(&source, &destination, &dir);
+            if !dir.is_dir() {
+                fs::create_dir(dir)?;
+            }
+        }
+
+        // Copies all files that need copying.
+        for file in self.files_to_copy {
+            let src = file.into_os_string().into_string().expect("bad file path");
+            let dst = replace_root(&source, &destination, &src);
+            if !dst.is_file() {
+                fs::copy(src, dst)?;
+            }
+        }
+
+        // Converts every MD file to HTML and places it in the destination.
+        for file in self.md_files {
+            let src = file
+                .path
+                .clone()
+                .into_os_string()
+                .into_string()
+                .expect("bad md path");
+            let dst = replace_root(&source, &destination, &src);
+
+            let (contents, template) = match file.template.clone() {
+                Some(tp) => match self.html_templates.get(&tp) {
+                    Some(t) => (fs::read_to_string(tp)?, t),
+                    None => (DEFAULT_HTML_TEMPLATE.to_owned(), &self.default_template),
+                },
+                None => (DEFAULT_HTML_TEMPLATE.to_owned(), &self.default_template),
+            };
+
+            let html = template.apply(&contents, file)?;
+            fs::write(dst, html)?;
+        }
+
+        Ok(())
     }
 }
 

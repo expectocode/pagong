@@ -1,3 +1,5 @@
+mod utils;
+
 use chrono::{NaiveDate, NaiveDateTime};
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -65,139 +67,6 @@ struct Scan {
     md_files: Vec<MdFile>,
 }
 
-/// Parses the next value in the given string. `value` is left at the next value. Parsed value is returned.
-fn parse_next_value(string: &mut &str) -> Option<String> {
-    let bytes = string.as_bytes();
-
-    let mut offset = 0;
-    while offset < bytes.len() {
-        if bytes[offset].is_ascii_whitespace() {
-            offset += 1;
-        } else {
-            break;
-        }
-    }
-
-    if offset == bytes.len() {
-        *string = &string[offset..];
-        return None;
-    }
-
-    let (value, end_offset) = if bytes[offset] == b'"' {
-        let mut value = Vec::with_capacity(bytes.len() - offset);
-        let mut escape = false;
-        let mut index = offset + 1;
-        let mut closed = false;
-        while index < bytes.len() {
-            if escape {
-                value.push(bytes[index]);
-                escape = false;
-            } else {
-                if bytes[index] == b'\\' {
-                    escape = true;
-                } else if bytes[index] == b'"' {
-                    closed = true;
-                    index += 1;
-                    break;
-                } else {
-                    value.push(bytes[index]);
-                }
-            }
-            index += 1;
-        }
-        if escape {
-            eprintln!(
-                "note: reached end of string with escape sequence open: {:?}",
-                string
-            );
-        }
-        if !closed {
-            eprintln!(
-                "note: reached end of string without closing it: {:?}",
-                string
-            );
-        }
-        (value, index)
-    } else {
-        let end_offset = match bytes[offset..].iter().position(|b| b.is_ascii_whitespace()) {
-            Some(i) => offset + i,
-            None => bytes.len(),
-        };
-        (bytes[offset..end_offset].to_vec(), end_offset)
-    };
-
-    *string = &string[end_offset..];
-    String::from_utf8(value).ok()
-}
-
-/// Get the absolute path out of value given the root and the path of the file being processed.
-fn get_abs_path(root: &PathBuf, path: Option<&PathBuf>, value: &str) -> PathBuf {
-    if value.starts_with('/') {
-        let mut p = root.clone();
-        p.push(&value[1..]);
-        p
-    } else {
-        let mut p = path.unwrap_or(root).clone();
-        p.push(value);
-        p
-    }
-}
-
-/// Replace's `path`'s `source` root with `destination`. Panics if `path` does not start with `source`.
-///
-/// Rust's path (and `OsString`) manipulation is pretty lacking, so the method falls back to `String`.
-fn replace_root(source: &String, destination: &String, path: &String) -> PathBuf {
-    assert!(path.starts_with(source));
-    let rel = &path[source.len() + 1..]; // +1 to skip path separator
-    let mut dir = PathBuf::from(&destination);
-    dir.push(rel);
-    dir
-}
-
-fn parse_opt_date(path: &PathBuf, created: bool, string: Option<&String>) -> NaiveDate {
-    match string {
-        Some(s) => match NaiveDate::parse_from_str(s, DATE_FMT) {
-            Ok(d) => return d,
-            Err(_) => eprintln!("note: invalid date value: {:?}", s),
-        },
-        None => {}
-    }
-
-    match fs::metadata(&path) {
-        Ok(meta) => {
-            if created {
-                match meta.created() {
-                    Ok(date) => {
-                        return NaiveDateTime::from_timestamp(
-                            date.duration_since(UNIX_EPOCH).unwrap().as_secs() as i64,
-                            0,
-                        )
-                        .date()
-                    }
-                    Err(_) => eprintln!("note: failed to fetch creation date for file: {:?}", path),
-                }
-            } else {
-                match meta.modified() {
-                    Ok(date) => {
-                        return NaiveDateTime::from_timestamp(
-                            date.duration_since(UNIX_EPOCH).unwrap().as_secs() as i64,
-                            0,
-                        )
-                        .date()
-                    }
-                    Err(_) => eprintln!(
-                        "note: failed to fetch modification date for file: {:?}",
-                        path
-                    ),
-                }
-            }
-        }
-        Err(_) => eprintln!("note: failed to fetch metadata for file: {:?}", path),
-    }
-
-    chrono::Local::today().naive_local()
-}
-
 impl MdFile {
     pub fn new(root: &PathBuf, path: PathBuf) -> io::Result<Self> {
         let mut meta = HashMap::new();
@@ -236,8 +105,8 @@ impl MdFile {
                 Some(s) => s.to_owned(),
                 None => path.file_name().unwrap().to_str().unwrap().to_owned(),
             },
-            date: parse_opt_date(&path, true, meta.get("date")),
-            updated: parse_opt_date(&path, false, meta.get("updated")),
+            date: utils::parse_opt_date(&path, true, meta.get("date")),
+            updated: utils::parse_opt_date(&path, false, meta.get("updated")),
             category: meta.get("category").cloned(),
             tags: match meta.get("tags") {
                 Some(s) => s.split(',').map(|s| s.trim().to_owned()).collect(),
@@ -245,7 +114,7 @@ impl MdFile {
             },
             template: meta
                 .get("template")
-                .map(|s| get_abs_path(&root, Some(&path), s)),
+                .map(|s| utils::get_abs_path(&root, Some(&path), s)),
             path,
             meta,
             md_offset,
@@ -256,12 +125,12 @@ impl MdFile {
 impl PreprocessorRule {
     fn new(root: &PathBuf, path: Option<&PathBuf>, mut string: &str) -> Option<Self> {
         let parsing = &mut string;
-        let rule = parse_next_value(parsing)?;
+        let rule = utils::parse_next_value(parsing)?;
         Some(match rule.as_str() {
             "CONTENTS" => PreprocessorRule::Contents,
             "CSS" => PreprocessorRule::Css,
             "TOC" => {
-                let depth = match parse_next_value(parsing) {
+                let depth = match utils::parse_next_value(parsing) {
                     Some(value) => match value.parse() {
                         Ok(depth) => depth,
                         Err(_) => {
@@ -274,15 +143,15 @@ impl PreprocessorRule {
                 PreprocessorRule::Toc { depth }
             }
             "LIST" => {
-                let path = get_abs_path(root, path, &parse_next_value(parsing)?);
+                let path = utils::get_abs_path(root, path, &utils::parse_next_value(parsing)?);
                 PreprocessorRule::Listing { path }
             }
             "META" => {
-                let key = parse_next_value(parsing)?;
+                let key = utils::parse_next_value(parsing)?;
                 PreprocessorRule::Meta { key }
             }
             "INCLUDE" => {
-                let path = get_abs_path(root, path, &parse_next_value(parsing)?);
+                let path = utils::get_abs_path(root, path, &utils::parse_next_value(parsing)?);
                 PreprocessorRule::Include { path }
             }
             _ => return None,
@@ -461,7 +330,7 @@ impl Scan {
         for dir in self.dirs_to_create {
             // Replace dir's prefix (source) with destination.
             let dir = dir.into_os_string().into_string().expect("bad dir path");
-            let dir = replace_root(&source, &destination, &dir);
+            let dir = utils::replace_root(&source, &destination, &dir);
             if !dir.is_dir() {
                 fs::create_dir(dir)?;
             }
@@ -470,7 +339,7 @@ impl Scan {
         // Copies all files that need copying.
         for file in self.files_to_copy {
             let src = file.into_os_string().into_string().expect("bad file path");
-            let dst = replace_root(&source, &destination, &src);
+            let dst = utils::replace_root(&source, &destination, &src);
             if !dst.is_file() {
                 fs::copy(src, dst)?;
             }
@@ -484,7 +353,7 @@ impl Scan {
                 .into_os_string()
                 .into_string()
                 .expect("bad md path");
-            let dst = replace_root(&source, &destination, &src);
+            let dst = utils::replace_root(&source, &destination, &src);
 
             let (contents, template) = match file.template.clone() {
                 Some(tp) => match self.html_templates.get(&tp) {
@@ -529,20 +398,26 @@ mod tests {
         #[test]
         fn simple() {
             let mut string = "simple";
-            assert_eq!(parse_next_value(&mut string), Some("simple".to_owned()));
+            assert_eq!(
+                utils::parse_next_value(&mut string),
+                Some("simple".to_owned())
+            );
         }
 
         #[test]
         fn quoted() {
             let mut string = "\"quoted\"";
-            assert_eq!(parse_next_value(&mut string), Some("quoted".to_owned()));
+            assert_eq!(
+                utils::parse_next_value(&mut string),
+                Some("quoted".to_owned())
+            );
         }
 
         #[test]
         fn good_escape() {
             let mut string = "\"good\\\" \\\"escape\"";
             assert_eq!(
-                parse_next_value(&mut string),
+                utils::parse_next_value(&mut string),
                 Some("good\" \"escape".to_owned())
             );
         }
@@ -550,14 +425,17 @@ mod tests {
         #[test]
         fn bad_escape() {
             let mut string = "\"bad\\_escape\"";
-            assert_eq!(parse_next_value(&mut string), Some("bad_escape".to_owned()));
+            assert_eq!(
+                utils::parse_next_value(&mut string),
+                Some("bad_escape".to_owned())
+            );
         }
 
         #[test]
         fn unterminated() {
             let mut string = "\"unterminated";
             assert_eq!(
-                parse_next_value(&mut string),
+                utils::parse_next_value(&mut string),
                 Some("unterminated".to_owned())
             );
         }
@@ -567,7 +445,7 @@ mod tests {
             let mut string = " simple \t\"quoted\" \n \"\\\"escapes\\\\\" \n\t \r simple";
             let string = &mut string;
             let mut values = Vec::new();
-            while let Some(value) = parse_next_value(string) {
+            while let Some(value) = utils::parse_next_value(string) {
                 values.push(value);
             }
 

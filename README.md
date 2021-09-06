@@ -51,21 +51,21 @@ Now you can move the contents of `dist/` to wherever you host your site and enjo
 
 Your `.md` files may contain the following syntax at the very top:
 
-```
-+++
+````
+```meta
 key = value
-+++
+```
 
 **Markdown** content follows as usual…
-```
+````
 
-The `+++` must appear on their own line with no spaces around them. The supported keys are:
+The code-block with `meta` lang must be the first markdown element in the file. The supported keys are:
 
-* `title`: Post title (e.g. "Hello, world!").
-* `date`: Published date, `YYYY-MM-DD` (Year, Month, Day) format (e.g. "2020-02-20").
-* `updated`: Updated date, `YYYY-MM-DD` format.
-* `category`: Category where the post belongs to (e.g. "computing").
-* `tags`: Comma-separated list of tags (e.g. "rust, ssg").
+* `title`: Post title (e.g. "Hello, world!"). If not specified, the first heading in the document is considered the title. If there is no first heading, the file name is used.
+* `date`: Published date, `YYYY-MM-DD` (Year, Month, Day) format (e.g. "2020-02-20"). If not specified, the file's creation date will be used. If it cannot be fetched, the current date will be used.
+* `updated`: Updated date, `YYYY-MM-DD` format. If not specified, the file's modification date will be used. If it cannot be fetched, `date` will be used.
+* `category`: Category where the post belongs to (e.g. "computing"). If not specified, the parent folder name will be used (e.g. "blog").
+* `tags`: Comma-separated list of tags (e.g. "rust, ssg"). If not specified, an empty list of tags is produced.
 * `template`: Path to the HTML file to be used as the template for this file, UNIX-style path, relative wherever the current file is (e.g. "/_blog.html" or "../_template.html").
 
 Any other key will be ignored by `pagong`, but may be used for your own needs.

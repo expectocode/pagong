@@ -1,32 +1,21 @@
+mod post;
 mod utils;
 
-use chrono::{NaiveDate, NaiveDateTime};
+use post::Post;
+
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
 use std::io;
 use std::ops::Range;
 use std::path::PathBuf;
-use std::time::UNIX_EPOCH;
 
 pub const SOURCE_PATH: &str = "content";
 pub const TARGET_PATH: &str = "dist";
-pub const DATE_FMT: &str = "%Y-%m-%d";
+pub const DATE_FMT: &str = "%F";
 pub const TEMPLATE_OPEN_MARKER: &str = "<!--P/";
 pub const TEMPLATE_CLOSE_MARKER: &str = "/P-->";
 pub const DEFAULT_HTML_TEMPLATE: &str = std::include_str!("../template.html");
-
-struct MdFile {
-    path: PathBuf,
-    title: String,
-    date: NaiveDate,
-    updated: NaiveDate,
-    category: Option<String>,
-    tags: Vec<String>,
-    template: Option<PathBuf>,
-    meta: HashMap<String, String>,
-    md_offset: usize,
-}
 
 #[derive(Clone)]
 enum PreprocessorRule {
@@ -64,62 +53,7 @@ struct Scan {
     /// HTML template to use when no other file can be used.
     default_template: HtmlTemplate,
     /// Markdown files to parse and generate HTML from.
-    md_files: Vec<MdFile>,
-}
-
-impl MdFile {
-    pub fn new(root: &PathBuf, path: PathBuf) -> io::Result<Self> {
-        let mut meta = HashMap::new();
-        let mut md_offset = 0;
-
-        let contents = fs::read_to_string(&path)?;
-
-        if &contents[..4] == "+++\n" {
-            if let Some(end_index) = contents.find("\n+++") {
-                md_offset = end_index + 4;
-                for line in contents[4..end_index].lines() {
-                    if line.trim().is_empty() {
-                        continue;
-                    }
-                    let index = match line.find('=') {
-                        Some(i) => i,
-                        None => {
-                            eprintln!("note: metadata line without value: {:?}", line);
-                            continue;
-                        }
-                    };
-                    let key = line[..index].trim().to_owned();
-                    let value = line[index + 1..].trim().to_owned();
-                    meta.insert(key, value);
-                }
-            } else {
-                eprintln!("note: md file with unclosed metadata: {:?}", path);
-                md_offset = contents.len();
-            }
-        } else {
-            eprintln!("note: md file without metadata: {:?}", path);
-        }
-
-        Ok(MdFile {
-            title: match meta.get("title") {
-                Some(s) => s.to_owned(),
-                None => path.file_name().unwrap().to_str().unwrap().to_owned(),
-            },
-            date: utils::parse_opt_date(&path, true, meta.get("date")),
-            updated: utils::parse_opt_date(&path, false, meta.get("updated")),
-            category: meta.get("category").cloned(),
-            tags: match meta.get("tags") {
-                Some(s) => s.split(',').map(|s| s.trim().to_owned()).collect(),
-                None => Vec::new(),
-            },
-            template: meta
-                .get("template")
-                .map(|s| utils::get_abs_path(&root, Some(&path), s)),
-            path,
-            meta,
-            md_offset,
-        })
-    }
+    md_files: Vec<Post>,
 }
 
 impl PreprocessorRule {
@@ -200,7 +134,7 @@ impl HtmlTemplate {
         Self { replacements }
     }
 
-    fn apply(&self, html: &String, md: MdFile) -> io::Result<String> {
+    fn apply(&self, html: &String, md: Post) -> io::Result<String> {
         let mut result = html.clone();
         let mut replacements = self.replacements.clone();
         replacements.sort_by_key(|r| r.range.start);
@@ -281,7 +215,7 @@ impl Scan {
                         scan.files_to_copy.push(entry.path());
                     } else {
                         // Parses all MD files.
-                        let md = MdFile::new(&scan.source, entry.path())?;
+                        let md = Post::new(&scan.source, entry.path())?;
                         if let Some(template) = md.template.as_ref() {
                             templates.insert(template.clone());
                         }

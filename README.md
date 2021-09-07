@@ -109,7 +109,7 @@ This comment will tell pagong to automatically generate a list of files in the g
 This comment will get replaced with whatever was put in the specified metadata key (in this example, the title):
 <!--P/ META title /P-->
 
-This comment will get replaced with the contents of whatever path is specified (relative to the current HTML template file):
+This comment will get replaced with the contents of whatever path is specified (relative to the current HTML template file). HTML files won't be escaped, but everything else will:
 <!--P/ INCLUDE path /P-->
 ```
 

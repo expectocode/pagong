@@ -154,7 +154,14 @@ impl HtmlTemplate {
                 PreprocessorRule::Meta { key } => {
                     md.meta.get(&key).cloned().unwrap_or_else(String::new)
                 }
-                PreprocessorRule::Include { path } => fs::read_to_string(path)?,
+                // TODO escape non-html
+                PreprocessorRule::Include { path } => match fs::read_to_string(&path) {
+                    Ok(s) => s,
+                    Err(_) => {
+                        eprintln!("note: failed to include {:?}", path);
+                        continue;
+                    }
+                },
             };
 
             result.replace_range(replacement.range, &value);

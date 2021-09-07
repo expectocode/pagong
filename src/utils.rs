@@ -94,6 +94,35 @@ pub fn replace_root(source: &String, destination: &String, path: &String) -> Pat
     dir
 }
 
+pub fn get_relative_uri(relative_to: &String, uri: &String) -> String {
+    let relative_to = relative_to.as_bytes();
+    let uri = uri.as_bytes();
+
+    let mut count_after = relative_to.len();
+    let mut last_shared_slash = 0;
+    for i in 0..relative_to.len().max(uri.len()) {
+        if relative_to.get(i) != uri.get(i) {
+            count_after = i;
+            break;
+        } else if let Some(b'/') = uri.get(i) {
+            last_shared_slash = i;
+        }
+    }
+
+    let up_count = relative_to
+        .iter()
+        .skip(count_after)
+        .filter(|c| **c == b'/')
+        .count();
+
+    let mut result = String::new();
+    (0..up_count).for_each(|_| result.push_str("../"));
+    uri[last_shared_slash + 1..]
+        .iter()
+        .for_each(|c| result.push(*c as _));
+    result
+}
+
 pub fn parse_opt_date(path: &PathBuf, created: bool, string: Option<&String>) -> NaiveDate {
     match string {
         Some(s) => match NaiveDate::parse_from_str(s, crate::DATE_FMT) {

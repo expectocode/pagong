@@ -29,6 +29,8 @@ pub struct Post {
     pub tags: Vec<String>,
     /// Post's template (from the metadata).
     pub template: Option<PathBuf>,
+    /// Post's absolute URI within a root.
+    pub uri: String,
 }
 
 impl Post {
@@ -138,6 +140,15 @@ impl Post {
             .get("template")
             .map(|s| crate::utils::get_abs_path(root, Some(&path), s));
 
+        let uri = crate::utils::replace_root(
+            &root.to_str().unwrap().to_owned(),
+            &String::new(),
+            &path.with_extension("html").to_str().unwrap().to_owned(),
+        )
+        .to_str()
+        .unwrap()
+        .replace(std::path::MAIN_SEPARATOR, "/");
+
         Ok(Self {
             path,
             markdown,
@@ -148,6 +159,7 @@ impl Post {
             category,
             tags,
             template,
+            uri,
         })
     }
 }

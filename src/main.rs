@@ -134,7 +134,7 @@ impl HtmlTemplate {
         Self { replacements }
     }
 
-    fn apply(&self, html: &String, md: Post) -> io::Result<String> {
+    fn apply(&self, html: &String, md: &Post, files: &Vec<Post>) -> io::Result<String> {
         let mut result = html.clone();
         let mut replacements = self.replacements.clone();
         replacements.sort_by_key(|r| r.range.start);
@@ -148,8 +148,21 @@ impl HtmlTemplate {
                 PreprocessorRule::Toc { depth: _ } => {
                     todo!("determine toc from md")
                 }
-                PreprocessorRule::Listing { path: _ } => {
-                    todo!("list all files")
+                PreprocessorRule::Listing { path } => {
+                    // TODO would like ordering and different formattings
+                    let mut res = String::new();
+                    res.push_str("<ul>");
+                    for file in files {
+                        if file.path.starts_with(&path) {
+                            res.push_str("<li><a href=\"");
+                            res.push_str(&utils::get_relative_uri(&md.uri, &file.uri));
+                            res.push_str("\">");
+                            res.push_str(&file.title);
+                            res.push_str("</a></li>");
+                        }
+                    }
+                    res.push_str("</ul>");
+                    res
                 }
                 PreprocessorRule::Meta { key } => {
                     md.meta.get(&key).cloned().unwrap_or_else(String::new)
@@ -287,7 +300,7 @@ impl Scan {
         }
 
         // Converts every MD file to HTML and places it in the destination.
-        for file in self.md_files {
+        for file in self.md_files.iter() {
             let src = file
                 .path
                 .clone()
@@ -304,7 +317,7 @@ impl Scan {
                 None => (DEFAULT_HTML_TEMPLATE.to_owned(), &self.default_template),
             };
 
-            let html = template.apply(&contents, file)?;
+            let html = template.apply(&contents, file, &self.md_files)?;
             fs::write(dst, html)?;
         }
 

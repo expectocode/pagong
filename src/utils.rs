@@ -75,7 +75,9 @@ pub fn get_abs_path(root: &PathBuf, path: Option<&PathBuf>, value: &str) -> Path
         p.push(&value[1..]);
         p
     } else {
-        let mut p = path.unwrap_or(root).clone();
+        let mut p = path
+            .map(|p| p.parent().unwrap().to_owned())
+            .unwrap_or(root.clone());
         p.push(value);
         p
     }

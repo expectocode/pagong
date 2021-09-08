@@ -97,7 +97,7 @@ pub fn replace_root(source: &String, destination: &String, path: &String) -> Pat
 pub fn path_to_uri(root: &PathBuf, path: &PathBuf) -> String {
     replace_root(
         &root.to_str().unwrap().to_owned(),
-        &String::new(),
+        &std::path::MAIN_SEPARATOR.to_string(),
         &path.to_str().unwrap().to_owned(),
     )
     .to_str()

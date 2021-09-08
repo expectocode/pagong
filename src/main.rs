@@ -359,6 +359,7 @@ impl Scan {
             let src = file
                 .path
                 .clone()
+                .with_extension("html")
                 .into_os_string()
                 .into_string()
                 .expect("bad md path");

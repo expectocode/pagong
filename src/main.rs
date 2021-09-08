@@ -134,7 +134,13 @@ impl HtmlTemplate {
         Self { replacements }
     }
 
-    fn apply(&self, html: &String, md: &Post, files: &Vec<Post>, css_files: &Vec<String>) -> io::Result<String> {
+    fn apply(
+        &self,
+        html: &String,
+        md: &Post,
+        files: &Vec<Post>,
+        css_files: &Vec<String>,
+    ) -> io::Result<String> {
         let mut result = html.clone();
         let mut replacements = self.replacements.clone();
         replacements.sort_by_key(|r| r.range.start);
@@ -267,7 +273,8 @@ impl Scan {
 
                     if ext.eq_ignore_ascii_case("css") {
                         // Detects all CSS files.
-                        scan.css_files.push(utils::path_to_uri(&root, &entry.path()));
+                        scan.css_files
+                            .push(utils::path_to_uri(&root, &entry.path()));
                     }
                     if !ext.eq_ignore_ascii_case("md") {
                         // Marks every file as needing a copy except for MD files.

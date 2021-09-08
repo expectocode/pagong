@@ -3,6 +3,7 @@ mod utils;
 
 use post::Post;
 
+use pulldown_cmark::Parser;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
@@ -147,7 +148,11 @@ impl HtmlTemplate {
 
         for replacement in replacements.into_iter().rev() {
             let value = match replacement.rule {
-                PreprocessorRule::Contents => fs::read_to_string(&md.path)?,
+                PreprocessorRule::Contents => {
+                    let mut res = String::new();
+                    pulldown_cmark::html::push_html(&mut res, Parser::new(&md.markdown));
+                    res
+                }
                 PreprocessorRule::Css => {
                     let mut res = String::new();
                     for css in css_files {

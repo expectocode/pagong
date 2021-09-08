@@ -145,8 +145,38 @@ impl HtmlTemplate {
                 PreprocessorRule::Css => {
                     todo!("determine all css that apply")
                 }
-                PreprocessorRule::Toc { depth: _ } => {
-                    todo!("determine toc from md")
+                PreprocessorRule::Toc { depth: max_depth } => {
+                    let mut res = String::new();
+                    let mut cur_depth = 0;
+                    for (heading, depth) in md.toc.iter() {
+                        let depth = *depth;
+                        if depth > max_depth {
+                            continue;
+                        }
+
+                        if cur_depth < depth {
+                            while cur_depth != depth {
+                                res.push_str("<ul>");
+                                cur_depth += 1;
+                            }
+                        } else if cur_depth > depth {
+                            while cur_depth != depth {
+                                res.push_str("</ul>");
+                                cur_depth -= 1;
+                            }
+                        }
+
+                        res.push_str("<li>");
+                        res.push_str(heading);
+                        res.push_str("</li>");
+                    }
+
+                    while cur_depth != 0 {
+                        res.push_str("</ul>");
+                        cur_depth -= 1;
+                    }
+
+                    res
                 }
                 PreprocessorRule::Listing { path } => {
                     // TODO would like ordering and different formattings

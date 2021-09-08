@@ -31,6 +31,8 @@ pub struct Post {
     pub template: Option<PathBuf>,
     /// Post's absolute URI within a root.
     pub uri: String,
+    /// Headings that make up the Table of Contents along with heading depth.
+    pub toc: Vec<(String, u8)>,
 }
 
 impl Post {
@@ -149,6 +151,22 @@ impl Post {
         .unwrap()
         .replace(std::path::MAIN_SEPARATOR, "/");
 
+        let toc = {
+            let mut toc_depth = None;
+            Parser::new(&markdown)
+                .filter_map(|event| {
+                    match event {
+                        Event::Start(Tag::Heading(depth)) => toc_depth = Some(depth as u8),
+                        Event::Text(s) if toc_depth.is_some() => {
+                            return Some((s.to_string(), toc_depth.take().unwrap()));
+                        }
+                        _ => {}
+                    }
+                    None
+                })
+                .collect()
+        };
+
         Ok(Self {
             path,
             markdown,
@@ -160,6 +178,7 @@ impl Post {
             tags,
             template,
             uri,
+            toc,
         })
     }
 }

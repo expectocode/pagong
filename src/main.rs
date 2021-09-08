@@ -319,6 +319,10 @@ impl Scan {
     /// * Copies all files that need copying.
     /// * Converts every MD file to HTML and places it in the destination.
     fn execute(self) -> io::Result<()> {
+        if !self.destination.is_dir() {
+            fs::create_dir(&self.destination)?;
+        }
+
         let source = self
             .source
             .into_os_string()

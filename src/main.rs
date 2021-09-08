@@ -297,7 +297,7 @@ impl Scan {
         }
 
         // Removes the HTML templates from the files that need copying.
-        scan.files_to_copy.retain(|path| templates.contains(path));
+        scan.files_to_copy.retain(|path| !templates.contains(path));
 
         // Parse templates.
         scan.html_templates.extend(templates.into_iter().filter_map(

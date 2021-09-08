@@ -94,6 +94,17 @@ pub fn replace_root(source: &String, destination: &String, path: &String) -> Pat
     dir
 }
 
+pub fn path_to_uri(root: &PathBuf, path: &PathBuf) -> String {
+    replace_root(
+        &root.to_str().unwrap().to_owned(),
+        &String::new(),
+        &path.to_str().unwrap().to_owned(),
+    )
+    .to_str()
+    .unwrap()
+    .replace(std::path::MAIN_SEPARATOR, "/")
+}
+
 pub fn get_relative_uri(relative_to: &String, uri: &String) -> String {
     let relative_to = relative_to.as_bytes();
     let uri = uri.as_bytes();

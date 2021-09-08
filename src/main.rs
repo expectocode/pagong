@@ -46,8 +46,8 @@ struct Scan {
     dirs_to_create: Vec<PathBuf>,
     /// Files to copy to the destination without any special treatment.
     files_to_copy: Vec<PathBuf>,
-    /// CSS files found.
-    css_files: Vec<PathBuf>,
+    /// URIs to the CSS files found.
+    css_files: Vec<String>,
     /// HTML templates found.
     html_templates: HashMap<PathBuf, HtmlTemplate>,
     /// HTML template to use when no other file can be used.
@@ -134,7 +134,7 @@ impl HtmlTemplate {
         Self { replacements }
     }
 
-    fn apply(&self, html: &String, md: &Post, files: &Vec<Post>) -> io::Result<String> {
+    fn apply(&self, html: &String, md: &Post, files: &Vec<Post>, css_files: &Vec<String>) -> io::Result<String> {
         let mut result = html.clone();
         let mut replacements = self.replacements.clone();
         replacements.sort_by_key(|r| r.range.start);
@@ -143,7 +143,16 @@ impl HtmlTemplate {
             let value = match replacement.rule {
                 PreprocessorRule::Contents => fs::read_to_string(&md.path)?,
                 PreprocessorRule::Css => {
-                    todo!("determine all css that apply")
+                    let mut res = String::new();
+                    for css in css_files {
+                        let parent = &css[..css.rfind('/').unwrap()];
+                        if md.uri.starts_with(parent) {
+                            res.push_str(r#"<link rel="stylesheet" type="text/css" href=""#);
+                            res.push_str(css);
+                            res.push_str("\">");
+                        }
+                    }
+                    res
                 }
                 PreprocessorRule::Toc { depth: max_depth } => {
                     let mut res = String::new();
@@ -258,7 +267,7 @@ impl Scan {
 
                     if ext.eq_ignore_ascii_case("css") {
                         // Detects all CSS files.
-                        scan.css_files.push(entry.path());
+                        scan.css_files.push(utils::path_to_uri(&root, &entry.path()));
                     }
                     if !ext.eq_ignore_ascii_case("md") {
                         // Marks every file as needing a copy except for MD files.
@@ -347,7 +356,7 @@ impl Scan {
                 None => (DEFAULT_HTML_TEMPLATE.to_owned(), &self.default_template),
             };
 
-            let html = template.apply(&contents, file, &self.md_files)?;
+            let html = template.apply(&contents, file, &self.md_files, &self.css_files)?;
             fs::write(dst, html)?;
         }
 

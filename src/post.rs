@@ -142,14 +142,7 @@ impl Post {
             .get("template")
             .map(|s| crate::utils::get_abs_path(root, Some(&path), s));
 
-        let uri = crate::utils::replace_root(
-            &root.to_str().unwrap().to_owned(),
-            &String::new(),
-            &path.with_extension("html").to_str().unwrap().to_owned(),
-        )
-        .to_str()
-        .unwrap()
-        .replace(std::path::MAIN_SEPARATOR, "/");
+        let uri = crate::utils::path_to_uri(&root, &path.with_extension("html"));
 
         let toc = {
             let mut toc_depth = None;

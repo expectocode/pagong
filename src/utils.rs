@@ -1,7 +1,4 @@
-use chrono::{Date, Local, NaiveDate, NaiveDateTime, TimeZone as _};
-use std::fs;
 use std::path::PathBuf;
-use std::time::UNIX_EPOCH;
 
 /// Parses the next value in the given string. `value` is left at the next value. Parsed value is returned.
 pub fn parse_next_value(string: &mut &str) -> Option<String> {
@@ -132,48 +129,4 @@ pub fn get_relative_uri(relative_to: &String, uri: &String) -> String {
         .iter()
         .for_each(|c| result.push(*c as _));
     result
-}
-
-pub fn parse_opt_date(path: &PathBuf, created: bool, string: Option<&String>) -> NaiveDate {
-    match string {
-        Some(s) => match NaiveDate::parse_from_str(s, crate::DATE_FMT) {
-            Ok(d) => return d,
-            Err(_) => eprintln!("note: invalid date value: {:?}", s),
-        },
-        None => {}
-    }
-
-    match fs::metadata(&path) {
-        Ok(meta) => {
-            if created {
-                match meta.created() {
-                    Ok(date) => {
-                        return NaiveDateTime::from_timestamp(
-                            date.duration_since(UNIX_EPOCH).unwrap().as_secs() as i64,
-                            0,
-                        )
-                        .date()
-                    }
-                    Err(_) => eprintln!("note: failed to fetch creation date for file: {:?}", path),
-                }
-            } else {
-                match meta.modified() {
-                    Ok(date) => {
-                        return NaiveDateTime::from_timestamp(
-                            date.duration_since(UNIX_EPOCH).unwrap().as_secs() as i64,
-                            0,
-                        )
-                        .date()
-                    }
-                    Err(_) => eprintln!(
-                        "note: failed to fetch modification date for file: {:?}",
-                        path
-                    ),
-                }
-            }
-        }
-        Err(_) => eprintln!("note: failed to fetch metadata for file: {:?}", path),
-    }
-
-    chrono::Local::today().naive_local()
 }

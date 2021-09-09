@@ -130,3 +130,60 @@ pub fn get_relative_uri(relative_to: &String, uri: &String) -> String {
         .for_each(|c| result.push(*c as _));
     result
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    mod parse_value {
+        use super::*;
+
+        #[test]
+        fn simple() {
+            let mut string = "simple";
+            assert_eq!(parse_next_value(&mut string), Some("simple".to_owned()));
+        }
+
+        #[test]
+        fn quoted() {
+            let mut string = "\"quoted\"";
+            assert_eq!(parse_next_value(&mut string), Some("quoted".to_owned()));
+        }
+
+        #[test]
+        fn good_escape() {
+            let mut string = "\"good\\\" \\\"escape\"";
+            assert_eq!(
+                parse_next_value(&mut string),
+                Some("good\" \"escape".to_owned())
+            );
+        }
+
+        #[test]
+        fn bad_escape() {
+            let mut string = "\"bad\\_escape\"";
+            assert_eq!(parse_next_value(&mut string), Some("bad_escape".to_owned()));
+        }
+
+        #[test]
+        fn unterminated() {
+            let mut string = "\"unterminated";
+            assert_eq!(
+                parse_next_value(&mut string),
+                Some("unterminated".to_owned())
+            );
+        }
+
+        #[test]
+        fn multiple() {
+            let mut string = " simple \t\"quoted\" \n \"\\\"escapes\\\\\" \n\t \r simple";
+            let string = &mut string;
+            let mut values = Vec::new();
+            while let Some(value) = parse_next_value(string) {
+                values.push(value);
+            }
+
+            assert_eq!(values, vec!["simple", "quoted", "\"escapes\\", "simple"]);
+        }
+    }
+}

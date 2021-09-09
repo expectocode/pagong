@@ -117,7 +117,12 @@ When replacing the "pre-processor" rules, the code will look exactly for the str
 
 ### Feed
 
-Any `.atom` file will be copied to `dist/`, but filled with the entries at the same level.
+Any `.atom` file will be copied to `dist/`, but filled with the entries at the same or lower level. The `.atom` file should contain two lines:
+
+1. The title of the feed (e.g. `Example's Blog`).
+2. The full URL of your site with no trailing slash (e.g. `https://example.com`).
+
+I really wish I could get away without using this "minimalistic" configuration file, but the information about it needs to go somewhere.
 
 ### Media
 

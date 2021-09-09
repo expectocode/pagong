@@ -3,6 +3,7 @@ mod utils;
 
 use post::Post;
 
+use atom_syndication as atom;
 use pulldown_cmark::Parser;
 use std::collections::{HashMap, HashSet};
 use std::env;
@@ -55,6 +56,8 @@ struct Scan {
     default_template: HtmlTemplate,
     /// Markdown files to parse and generate HTML from.
     md_files: Vec<Post>,
+    /// ATOM feeds to fill.
+    atom_files: Vec<PathBuf>,
 }
 
 impl PreprocessorRule {
@@ -255,6 +258,7 @@ impl Scan {
             html_templates: HashMap::new(),
             default_template: HtmlTemplate::new(&root, None, DEFAULT_HTML_TEMPLATE.to_owned()),
             md_files: Vec::new(),
+            atom_files: Vec::new(),
         };
         let mut templates = HashSet::new();
 
@@ -281,7 +285,10 @@ impl Scan {
                         scan.css_files
                             .push(utils::path_to_uri(&root, &entry.path()));
                     }
-                    if !ext.eq_ignore_ascii_case("md") {
+
+                    if ext.eq_ignore_ascii_case("atom") {
+                        scan.atom_files.push(entry.path());
+                    } else if !ext.eq_ignore_ascii_case("md") {
                         // Marks every file as needing a copy except for MD files.
                         scan.files_to_copy.push(entry.path());
                     } else {
@@ -325,20 +332,26 @@ impl Scan {
 
         let source = self
             .source
+            .clone()
             .into_os_string()
             .into_string()
             .expect("bad source path");
 
         let destination = self
             .destination
+            .clone()
             .into_os_string()
             .into_string()
             .expect("bad destination path");
 
         // Creates all directories that need creating.
-        for dir in self.dirs_to_create {
+        for dir in self.dirs_to_create.iter() {
             // Replace dir's prefix (source) with destination.
-            let dir = dir.into_os_string().into_string().expect("bad dir path");
+            let dir = dir
+                .clone()
+                .into_os_string()
+                .into_string()
+                .expect("bad dir path");
             let dir = utils::replace_root(&source, &destination, &dir);
             if !dir.is_dir() {
                 fs::create_dir(dir)?;
@@ -346,12 +359,111 @@ impl Scan {
         }
 
         // Copies all files that need copying.
-        for file in self.files_to_copy {
-            let src = file.into_os_string().into_string().expect("bad file path");
+        for file in self.files_to_copy.iter() {
+            let src = file
+                .clone()
+                .into_os_string()
+                .into_string()
+                .expect("bad file path");
             let dst = utils::replace_root(&source, &destination, &src);
             if !dst.is_file() {
                 fs::copy(src, dst)?;
             }
+        }
+
+        // Generate all feeds.
+        for file in self.atom_files.iter() {
+            let conf = fs::read_to_string(&file)?;
+            let mut conf = conf.lines().map(|l| l.trim()).filter(|l| !l.is_empty());
+
+            let feed_title = conf.next().map(|s| s.to_string()).unwrap_or_else(|| {
+                self.source
+                    .parent()
+                    .unwrap()
+                    .file_name()
+                    .unwrap()
+                    .to_str()
+                    .unwrap()
+                    .to_owned()
+            });
+
+            let feed_url = conf
+                .next()
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| "https://example.com".to_owned());
+
+            let uri = utils::path_to_uri(&self.source, &file.parent().unwrap().to_owned());
+            let src = file
+                .clone()
+                .into_os_string()
+                .into_string()
+                .expect("bad file path");
+            let dst = utils::replace_root(&source, &destination, &src);
+            let mut entries = Vec::new();
+            let mut last_updated = None;
+
+            for md in self.md_files.iter() {
+                if md.uri.starts_with(&uri) {
+                    if let Some(updated) = last_updated {
+                        last_updated = Some(md.updated.max(updated));
+                    } else {
+                        last_updated = Some(md.updated);
+                    }
+
+                    entries.push(atom::Entry {
+                        title: md.title.clone().into(),
+                        id: {
+                            let mut s = feed_url.clone();
+                            s.push_str(&md.uri);
+                            s
+                        },
+                        updated: md.updated.and_hms(0, 0, 0).into(),
+                        published: Some(md.date.and_hms(0, 0, 0).into()),
+                        categories: vec![atom::Category {
+                            term: md.category.clone(),
+                            ..atom::Category::default()
+                        }],
+                        content: Some(atom::Content {
+                            value: {
+                                let mut html = String::new();
+                                pulldown_cmark::html::push_html(
+                                    &mut html,
+                                    Parser::new(&md.markdown),
+                                );
+                                let mut escaped = String::new();
+                                pulldown_cmark::escape::escape_html(&mut escaped, &html).unwrap();
+                                Some(escaped)
+                            },
+                            content_type: Some("html".to_string()),
+                            ..atom::Content::default()
+                        }),
+                        ..atom::Entry::default()
+                    });
+                }
+            }
+
+            fs::write(
+                dst,
+                atom::Feed {
+                    title: feed_title.into(),
+                    id: feed_url.clone(),
+                    updated: last_updated
+                        .map(|d| d.and_hms(0, 0, 0).into())
+                        .unwrap_or_else(|| chrono::offset::Local::now().into()),
+                    entries,
+                    links: vec![atom::Link {
+                        rel: "self".into(),
+                        href: {
+                            let mut s = feed_url;
+                            s.push_str(&uri);
+                            s
+                        },
+                        ..atom::Link::default()
+                    }],
+                    ..atom::Feed::default()
+                }
+                .to_string(),
+            )?;
         }
 
         // Converts every MD file to HTML and places it in the destination.

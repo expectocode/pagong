@@ -85,7 +85,7 @@ pub fn get_abs_path(root: &PathBuf, path: Option<&PathBuf>, value: &str) -> Path
 /// Rust's path (and `OsString`) manipulation is pretty lacking, so the method falls back to `String`.
 pub fn replace_root(source: &String, destination: &String, path: &String) -> PathBuf {
     assert!(path.starts_with(source));
-    let rel = &path[source.len() + 1..]; // +1 to skip path separator
+    let rel = &path[(source.len() + 1).min(path.len())..]; // +1 to skip path separator
     let mut dir = PathBuf::from(&destination);
     dir.push(rel);
     dir

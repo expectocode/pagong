@@ -3,7 +3,6 @@ mod post;
 mod template;
 mod utils;
 
-use blog::Scan;
 use post::Post;
 use template::HtmlTemplate;
 
@@ -29,7 +28,8 @@ fn main() -> io::Result<()> {
     let mut dist = root;
     dist.push(TARGET_PATH);
 
-    Scan::new(content, dist)?.execute()?;
+    let scan = blog::scan_dir(content)?;
+    blog::generate_from_scan(scan, dist)?;
 
     Ok(())
 }

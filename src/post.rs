@@ -1,3 +1,9 @@
+use crate::{
+    DIST_FILE_EXT, META_KEY_CATEGORY, META_KEY_CREATION_DATE, META_KEY_MODIFIED_DATE,
+    META_KEY_TAGS, META_KEY_TEMPLATE, META_KEY_TITLE, META_TAG_SEPARATOR, META_VALUE_SEPARATOR,
+    SOURCE_META_KEY,
+};
+
 use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag};
 use std::collections::HashMap;
 use std::fs;
@@ -7,6 +13,8 @@ use std::time::UNIX_EPOCH;
 
 use chrono::offset::Local;
 use chrono::{Date, NaiveDate, NaiveDateTime, TimeZone};
+
+const ZWNBSP: &str = "\u{FEFF}";
 
 /// Represents a Markdown Post that will be converted into HTML.
 #[derive(Debug, Clone)]
@@ -43,15 +51,15 @@ impl Post {
         // where the meta code block starts correctly.
         //
         // Remove it here to avoid such issue (allocating only if needed).
-        let mut markdown = fs::read_to_string(&path)?.replace("\u{FEFF}", "");
+        let mut markdown = fs::read_to_string(&path)?.replace(ZWNBSP, "");
 
         let mut meta = HashMap::new();
         if let Some((Event::Start(Tag::CodeBlock(CodeBlockKind::Fenced(lang))), start_range)) =
             Parser::new(&markdown).into_offset_iter().next()
         {
-            if lang.as_ref() == "meta" {
+            if lang.as_ref() == SOURCE_META_KEY {
                 meta.extend(markdown[start_range.clone()].lines().filter_map(|line| {
-                    let mut kv = line.splitn(2, '=');
+                    let mut kv = line.splitn(2, META_VALUE_SEPARATOR);
                     kv.next()
                         .zip(kv.next())
                         .map(|(k, v)| (k.trim().to_owned(), v.trim().to_owned()))
@@ -61,7 +69,7 @@ impl Post {
         }
 
         let title = meta
-            .get("title")
+            .get(META_KEY_TITLE)
             .cloned()
             .or_else(|| {
                 let mut wait_title = false;
@@ -86,7 +94,7 @@ impl Post {
 
         let metadata = fs::metadata(&path)?;
         let date = meta
-            .get("date")
+            .get(META_KEY_CREATION_DATE)
             .and_then(|date| NaiveDate::parse_from_str(date, crate::DATE_FMT).ok())
             .or_else(|| {
                 metadata
@@ -105,7 +113,7 @@ impl Post {
             .unwrap_or_else(|| Local::now().date());
 
         let updated = meta
-            .get("updated")
+            .get(META_KEY_MODIFIED_DATE)
             .and_then(|date| NaiveDate::parse_from_str(date, crate::DATE_FMT).ok())
             .or_else(|| {
                 metadata
@@ -123,7 +131,7 @@ impl Post {
             .and_then(|date| Local.from_local_date(&date).latest())
             .unwrap_or(date);
 
-        let category = meta.get("category").cloned().unwrap_or_else(|| {
+        let category = meta.get(META_KEY_CATEGORY).cloned().unwrap_or_else(|| {
             path.parent()
                 .expect("post file had no parent")
                 .file_name()
@@ -134,15 +142,19 @@ impl Post {
         });
 
         let tags = meta
-            .get("tags")
-            .map(|tags| tags.split(',').map(|s| s.trim().to_owned()).collect())
+            .get(META_KEY_TAGS)
+            .map(|tags| {
+                tags.split(META_TAG_SEPARATOR)
+                    .map(|s| s.trim().to_owned())
+                    .collect()
+            })
             .unwrap_or_else(Vec::new);
 
         let template = meta
-            .get("template")
+            .get(META_KEY_TEMPLATE)
             .map(|s| crate::utils::get_abs_path(root, Some(&path), s));
 
-        let uri = crate::utils::path_to_uri(&root, &path.with_extension("html"));
+        let uri = crate::utils::path_to_uri(&root, &path.with_extension(DIST_FILE_EXT));
 
         let toc = {
             let mut toc_depth = None;

@@ -6,6 +6,13 @@ use std::io;
 use std::ops::Range;
 use std::path::PathBuf;
 
+const RULE_CONTENTS: &str = "CONTENTS";
+const RULE_CSS: &str = "CSS";
+const RULE_TOC: &str = "TOC";
+const RULE_LIST: &str = "LIST";
+const RULE_META: &str = "META";
+const RULE_INCLUDE: &str = "INCLUDE";
+
 #[derive(Clone)]
 enum PreprocessorRule {
     Contents,
@@ -31,9 +38,9 @@ impl PreprocessorRule {
         let parsing = &mut string;
         let rule = utils::parse_next_value(parsing)?;
         Some(match rule.as_str() {
-            "CONTENTS" => PreprocessorRule::Contents,
-            "CSS" => PreprocessorRule::Css,
-            "TOC" => {
+            RULE_CONTENTS => PreprocessorRule::Contents,
+            RULE_CSS => PreprocessorRule::Css,
+            RULE_TOC => {
                 let depth = match utils::parse_next_value(parsing) {
                     Some(value) => match value.parse() {
                         Ok(depth) => depth,
@@ -46,15 +53,15 @@ impl PreprocessorRule {
                 };
                 PreprocessorRule::Toc { depth }
             }
-            "LIST" => {
+            RULE_LIST => {
                 let path = utils::get_abs_path(root, path, &utils::parse_next_value(parsing)?);
                 PreprocessorRule::Listing { path }
             }
-            "META" => {
+            RULE_META => {
                 let key = utils::parse_next_value(parsing)?;
                 PreprocessorRule::Meta { key }
             }
-            "INCLUDE" => {
+            RULE_INCLUDE => {
                 let path = utils::get_abs_path(root, path, &utils::parse_next_value(parsing)?);
                 PreprocessorRule::Include { path }
             }

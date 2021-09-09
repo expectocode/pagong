@@ -1,4 +1,7 @@
-use crate::{utils, HtmlTemplate, Post, DEFAULT_HTML_TEMPLATE};
+use crate::{
+    utils, HtmlTemplate, Post, DEFAULT_FEED_URL, DEFAULT_HTML_TEMPLATE, DIST_FILE_EXT,
+    FEED_CONTENT_TYPE, FEED_FILE_EXT, FEED_REL, SOURCE_FILE_EXT, STYLE_FILE_EXT,
+};
 
 use atom_syndication as atom;
 use pulldown_cmark::Parser;
@@ -53,14 +56,14 @@ pub fn scan_dir(root: PathBuf) -> io::Result<Scan> {
                     .unwrap_or_else(|| filename.len());
                 let ext = &filename[ext_idx..];
 
-                if ext.eq_ignore_ascii_case("css") {
+                if ext.eq_ignore_ascii_case(STYLE_FILE_EXT) {
                     // Detects all CSS files.
                     css_files.push(utils::path_to_uri(&root, &entry.path()));
                 }
 
-                if ext.eq_ignore_ascii_case("atom") {
+                if ext.eq_ignore_ascii_case(FEED_FILE_EXT) {
                     atom_files.push(entry.path());
-                } else if !ext.eq_ignore_ascii_case("md") {
+                } else if !ext.eq_ignore_ascii_case(SOURCE_FILE_EXT) {
                     // Marks every file as needing a copy except for MD files.
                     files_to_copy.push(entry.path());
                 } else {
@@ -168,7 +171,7 @@ pub fn generate_from_scan(scan: Scan, destination: PathBuf) -> io::Result<()> {
         let feed_url = conf
             .next()
             .map(|s| s.to_string())
-            .unwrap_or_else(|| "https://example.com".to_owned());
+            .unwrap_or_else(|| DEFAULT_FEED_URL.to_owned());
 
         let uri = utils::path_to_uri(&scan.root, &file.parent().unwrap().to_owned());
         let src = file
@@ -209,7 +212,7 @@ pub fn generate_from_scan(scan: Scan, destination: PathBuf) -> io::Result<()> {
                             pulldown_cmark::escape::escape_html(&mut escaped, &html).unwrap();
                             Some(escaped)
                         },
-                        content_type: Some("html".to_string()),
+                        content_type: Some(FEED_CONTENT_TYPE.to_string()),
                         ..atom::Content::default()
                     }),
                     ..atom::Entry::default()
@@ -227,7 +230,7 @@ pub fn generate_from_scan(scan: Scan, destination: PathBuf) -> io::Result<()> {
                     .unwrap_or_else(|| chrono::offset::Local::now().into()),
                 entries,
                 links: vec![atom::Link {
-                    rel: "self".into(),
+                    rel: FEED_REL.into(),
                     href: {
                         let mut s = feed_url;
                         s.push_str(&uri);
@@ -246,7 +249,7 @@ pub fn generate_from_scan(scan: Scan, destination: PathBuf) -> io::Result<()> {
         let src = file
             .path
             .clone()
-            .with_extension("html")
+            .with_extension(DIST_FILE_EXT)
             .into_os_string()
             .into_string()
             .expect("bad md path");

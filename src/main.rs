@@ -1,4 +1,5 @@
 mod blog;
+mod feed;
 mod post;
 mod template;
 mod utils;
@@ -37,9 +38,9 @@ pub const STYLE_FILE_EXT: &str = "css";
 pub const FEED_FILE_EXT: &str = "atom";
 
 // Feed defaults.
-pub const DEFAULT_FEED_URL: &str = "https://example.com";
 pub const FEED_CONTENT_TYPE: &str = "html";
 pub const FEED_REL: &str = "self";
+pub const FEED_TYPE: &str = "application/atom+xml";
 
 fn main() -> io::Result<()> {
     let root = match env::args().nth(1) {

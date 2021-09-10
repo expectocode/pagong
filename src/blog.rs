@@ -1,10 +1,8 @@
 use crate::{
-    utils, HtmlTemplate, Post, DEFAULT_FEED_URL, DEFAULT_HTML_TEMPLATE, DIST_FILE_EXT,
-    FEED_CONTENT_TYPE, FEED_FILE_EXT, FEED_REL, SOURCE_FILE_EXT, STYLE_FILE_EXT,
+    feed, utils, HtmlTemplate, Post, DEFAULT_HTML_TEMPLATE, DIST_FILE_EXT, FEED_FILE_EXT,
+    SOURCE_FILE_EXT, STYLE_FILE_EXT,
 };
 
-use atom_syndication as atom;
-use pulldown_cmark::Parser;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::io;
@@ -26,7 +24,7 @@ pub struct Scan {
     /// Markdown files to parse and generate HTML from.
     md_files: Vec<Post>,
     /// ATOM feeds to fill.
-    atom_files: Vec<PathBuf>,
+    atom_files: Vec<feed::Meta>,
 }
 
 /// Scan a directory containing a blog made up of markdown files, templates and assets.
@@ -62,7 +60,13 @@ pub fn scan_dir(root: PathBuf) -> io::Result<Scan> {
                 }
 
                 if ext.eq_ignore_ascii_case(FEED_FILE_EXT) {
-                    atom_files.push(entry.path());
+                    match feed::load_atom_feed(&entry.path()) {
+                        Ok(atom) => atom_files.push(atom),
+                        Err(e) => {
+                            eprintln!("note: failed to load atom feed: {}: {:?}", e, entry.path());
+                            files_to_copy.push(entry.path());
+                        }
+                    }
                 } else if !ext.eq_ignore_ascii_case(SOURCE_FILE_EXT) {
                     // Marks every file as needing a copy except for MD files.
                     files_to_copy.push(entry.path());
@@ -153,95 +157,16 @@ pub fn generate_from_scan(scan: Scan, destination: PathBuf) -> io::Result<()> {
     }
 
     // Generate all feeds.
-    for file in scan.atom_files.iter() {
-        let conf = fs::read_to_string(&file)?;
-        let mut conf = conf.lines().map(|l| l.trim()).filter(|l| !l.is_empty());
-
-        let feed_title = conf.next().map(|s| s.to_string()).unwrap_or_else(|| {
-            scan.root
-                .parent()
-                .unwrap()
-                .file_name()
-                .unwrap()
-                .to_str()
-                .unwrap()
-                .to_owned()
-        });
-
-        let feed_url = conf
-            .next()
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| DEFAULT_FEED_URL.to_owned());
-
-        let uri = utils::path_to_uri(&scan.root, &file.parent().unwrap().to_owned());
-        let src = file
+    for atom in scan.atom_files {
+        let src = atom
+            .path
             .clone()
             .into_os_string()
             .into_string()
             .expect("bad file path");
+
         let dst = utils::replace_root(&source, &destination, &src);
-        let mut entries = Vec::new();
-        let mut last_updated = None;
-
-        for md in scan.md_files.iter() {
-            if md.uri.starts_with(&uri) {
-                if let Some(updated) = last_updated {
-                    last_updated = Some(md.updated.max(updated));
-                } else {
-                    last_updated = Some(md.updated);
-                }
-
-                entries.push(atom::Entry {
-                    title: md.title.clone().into(),
-                    id: {
-                        let mut s = feed_url.clone();
-                        s.push_str(&md.uri);
-                        s
-                    },
-                    updated: md.updated.and_hms(0, 0, 0).into(),
-                    published: Some(md.date.and_hms(0, 0, 0).into()),
-                    categories: vec![atom::Category {
-                        term: md.category.clone(),
-                        ..atom::Category::default()
-                    }],
-                    content: Some(atom::Content {
-                        value: {
-                            let mut html = String::new();
-                            pulldown_cmark::html::push_html(&mut html, Parser::new(&md.markdown));
-                            let mut escaped = String::new();
-                            pulldown_cmark::escape::escape_html(&mut escaped, &html).unwrap();
-                            Some(escaped)
-                        },
-                        content_type: Some(FEED_CONTENT_TYPE.to_string()),
-                        ..atom::Content::default()
-                    }),
-                    ..atom::Entry::default()
-                });
-            }
-        }
-
-        fs::write(
-            dst,
-            atom::Feed {
-                title: feed_title.into(),
-                id: feed_url.clone(),
-                updated: last_updated
-                    .map(|d| d.and_hms(0, 0, 0).into())
-                    .unwrap_or_else(|| chrono::offset::Local::now().into()),
-                entries,
-                links: vec![atom::Link {
-                    rel: FEED_REL.into(),
-                    href: {
-                        let mut s = feed_url;
-                        s.push_str(&uri);
-                        s
-                    },
-                    ..atom::Link::default()
-                }],
-                ..atom::Feed::default()
-            }
-            .to_string(),
-        )?;
+        fs::write(dst, feed::fill_atom_feed(atom, &scan.md_files))?;
     }
 
     // Converts every MD file to HTML and places it in the destination.

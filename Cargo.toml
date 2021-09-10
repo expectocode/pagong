@@ -11,6 +11,7 @@ readme = "README.md"
 
 [dependencies]
 atom_syndication = { version = "0.10", default-features = false }
+quick-xml = "0.22"  # should match that of atom_syndication
 chrono = "0.4"
 pulldown-cmark = "0.8"
 anyhow = "1.0"

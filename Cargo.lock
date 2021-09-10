@@ -116,6 +116,7 @@ dependencies = [
  "atom_syndication",
  "chrono",
  "pulldown-cmark",
+ "quick-xml",
 ]
 
 [[package]]

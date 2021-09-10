@@ -117,12 +117,15 @@ When replacing the "pre-processor" rules, the code will look exactly for the str
 
 ### Feed
 
-Any `.atom` file will be copied to `dist/`, but filled with the entries at the same or lower level. The `.atom` file should contain two lines:
+Any `.atom` file will be copied to `dist/`, but its root `feed` tag will be filled with `entry` tags automatically. Here's a basic `.atom` file which would do the trick (and you're free to remove the `generator` tag):
 
-1. The title of the feed (e.g. `Example's Blog`).
-2. The full URL of your site with no trailing slash (e.g. `https://example.com`).
-
-I really wish I could get away without using this "minimalistic" configuration file, but the information about it needs to go somewhere.
+```xml
+<feed xml:lang="en">
+    <title>Example's Blog</title>
+    <link href="https://example.com/blog/"/>
+    <generator uri="https://github.com/expectocode/pagong">pagong with atom_syndication</generator>
+</feed>
+```
 
 ### Media
 

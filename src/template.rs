@@ -1,10 +1,11 @@
 use crate::{utils, Post, TEMPLATE_CLOSE_MARKER, TEMPLATE_OPEN_MARKER};
 
 use pulldown_cmark::Parser;
+use std::cmp::Ordering;
 use std::fs;
 use std::io;
 use std::ops::Range;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 const RULE_CONTENTS: &str = "CONTENTS";
 const RULE_CSS: &str = "CSS";
@@ -34,7 +35,7 @@ pub struct HtmlTemplate {
 }
 
 impl PreprocessorRule {
-    fn new(root: &PathBuf, path: Option<&PathBuf>, mut string: &str) -> Option<Self> {
+    fn new(root: &Path, path: Option<&Path>, mut string: &str) -> Option<Self> {
         let parsing = &mut string;
         let rule = utils::parse_next_value(parsing)?;
         Some(match rule.as_str() {
@@ -71,12 +72,12 @@ impl PreprocessorRule {
 }
 
 impl HtmlTemplate {
-    pub fn load(root: &PathBuf, path: &PathBuf) -> io::Result<Self> {
+    pub fn load(root: &Path, path: &Path) -> io::Result<Self> {
         let contents = fs::read_to_string(&path)?;
         Ok(Self::new(root, Some(path), contents))
     }
 
-    pub fn new(root: &PathBuf, path: Option<&PathBuf>, contents: String) -> Self {
+    pub fn new(root: &Path, path: Option<&Path>, contents: String) -> Self {
         let mut replacements = Vec::new();
         let mut offset = 0;
         while let Some(index) = contents[offset..].find(TEMPLATE_OPEN_MARKER) {
@@ -113,12 +114,11 @@ impl HtmlTemplate {
 
     pub fn apply(
         &self,
-        html: &String,
+        mut html: String,
         md: &Post,
-        files: &Vec<Post>,
-        css_files: &Vec<String>,
+        files: &[Post],
+        css_files: &[String],
     ) -> io::Result<String> {
-        let mut result = html.clone();
         let mut replacements = self.replacements.clone();
         replacements.sort_by_key(|r| r.range.start);
 
@@ -150,16 +150,20 @@ impl HtmlTemplate {
                             continue;
                         }
 
-                        if cur_depth < depth {
-                            while cur_depth != depth {
-                                res.push_str("<ul>");
-                                cur_depth += 1;
+                        match cur_depth.cmp(&depth) {
+                            Ordering::Less => {
+                                while cur_depth != depth {
+                                    res.push_str("<ul>");
+                                    cur_depth += 1;
+                                }
                             }
-                        } else if cur_depth > depth {
-                            while cur_depth != depth {
-                                res.push_str("</ul>");
-                                cur_depth -= 1;
+                            Ordering::Greater => {
+                                while cur_depth != depth {
+                                    res.push_str("</ul>");
+                                    cur_depth -= 1;
+                                }
                             }
+                            _ => {}
                         }
 
                         res.push_str("<li>");
@@ -203,9 +207,9 @@ impl HtmlTemplate {
                 },
             };
 
-            result.replace_range(replacement.range, &value);
+            html.replace_range(replacement.range, &value);
         }
 
-        Ok(result)
+        Ok(html)
     }
 }

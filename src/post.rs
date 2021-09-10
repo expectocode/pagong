@@ -8,7 +8,7 @@ use pulldown_cmark::{CodeBlockKind, Event, Parser, Tag};
 use std::collections::HashMap;
 use std::fs;
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
 use chrono::offset::Local;
@@ -45,7 +45,7 @@ pub struct Post {
 
 impl Post {
     /// Parse a markdown file into a `Post`.
-    pub fn new(root: &PathBuf, path: PathBuf) -> io::Result<Self> {
+    pub fn new(root: &Path, path: PathBuf) -> io::Result<Self> {
         // UTF-8 BOM becomes zero-width non-breaking space, which `trim()` won't remove,
         // but if we leave it there then metadata loading will break and not recognise
         // where the meta code block starts correctly.
@@ -154,7 +154,7 @@ impl Post {
             .get(META_KEY_TEMPLATE)
             .map(|s| crate::utils::get_abs_path(root, Some(&path), s));
 
-        let uri = crate::utils::path_to_uri(&root, &path.with_extension(DIST_FILE_EXT));
+        let uri = crate::utils::path_to_uri(root, &path.with_extension(DIST_FILE_EXT));
 
         let toc = {
             let mut toc_depth = None;

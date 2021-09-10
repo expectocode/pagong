@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Parses the next value in the given string. `value` is left at the next value. Parsed value is returned.
 pub fn parse_next_value(string: &mut &str) -> Option<String> {
@@ -27,16 +27,14 @@ pub fn parse_next_value(string: &mut &str) -> Option<String> {
             if escape {
                 value.push(bytes[index]);
                 escape = false;
+            } else if bytes[index] == b'\\' {
+                escape = true;
+            } else if bytes[index] == b'"' {
+                closed = true;
+                index += 1;
+                break;
             } else {
-                if bytes[index] == b'\\' {
-                    escape = true;
-                } else if bytes[index] == b'"' {
-                    closed = true;
-                    index += 1;
-                    break;
-                } else {
-                    value.push(bytes[index]);
-                }
+                value.push(bytes[index]);
             }
             index += 1;
         }
@@ -66,15 +64,15 @@ pub fn parse_next_value(string: &mut &str) -> Option<String> {
 }
 
 /// Get the absolute path out of value given the root and the path of the file being processed.
-pub fn get_abs_path(root: &PathBuf, path: Option<&PathBuf>, value: &str) -> PathBuf {
-    if value.starts_with('/') {
-        let mut p = root.clone();
-        p.push(&value[1..]);
+pub fn get_abs_path(root: &Path, path: Option<&Path>, value: &str) -> PathBuf {
+    if let Some(absolute) = value.strip_prefix('/') {
+        let mut p = root.to_path_buf();
+        p.push(absolute);
         p
     } else {
         let mut p = path
             .map(|p| p.parent().unwrap().to_owned())
-            .unwrap_or(root.clone());
+            .unwrap_or_else(|| root.to_path_buf());
         p.push(value);
         p
     }
@@ -83,7 +81,7 @@ pub fn get_abs_path(root: &PathBuf, path: Option<&PathBuf>, value: &str) -> Path
 /// Replace's `path`'s `source` root with `destination`. Panics if `path` does not start with `source`.
 ///
 /// Rust's path (and `OsString`) manipulation is pretty lacking, so the method falls back to `String`.
-pub fn replace_root(source: &String, destination: &String, path: &String) -> PathBuf {
+pub fn replace_root(source: &str, destination: &str, path: &str) -> PathBuf {
     assert!(path.starts_with(source));
     let rel = &path[(source.len() + 1).min(path.len())..]; // +1 to skip path separator
     let mut dir = PathBuf::from(&destination);
@@ -91,7 +89,7 @@ pub fn replace_root(source: &String, destination: &String, path: &String) -> Pat
     dir
 }
 
-pub fn path_to_uri(root: &PathBuf, path: &PathBuf) -> String {
+pub fn path_to_uri(root: &Path, path: &Path) -> String {
     replace_root(
         &root.to_str().unwrap().to_owned(),
         &std::path::MAIN_SEPARATOR.to_string(),
@@ -102,7 +100,7 @@ pub fn path_to_uri(root: &PathBuf, path: &PathBuf) -> String {
     .replace(std::path::MAIN_SEPARATOR, "/")
 }
 
-pub fn get_relative_uri(relative_to: &String, uri: &String) -> String {
+pub fn get_relative_uri(relative_to: &str, uri: &str) -> String {
     let relative_to = relative_to.as_bytes();
     let uri = uri.as_bytes();
 

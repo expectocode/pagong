@@ -124,7 +124,6 @@ pub fn generate_from_scan(scan: Scan, destination: PathBuf) -> io::Result<()> {
         .expect("bad source path");
 
     let destination = destination
-        .clone()
         .into_os_string()
         .into_string()
         .expect("bad destination path");
@@ -188,7 +187,7 @@ pub fn generate_from_scan(scan: Scan, destination: PathBuf) -> io::Result<()> {
             None => (DEFAULT_HTML_TEMPLATE.to_owned(), &scan.default_template),
         };
 
-        let html = template.apply(&contents, file, &scan.md_files, &scan.css_files)?;
+        let html = template.apply(contents, file, &scan.md_files, &scan.css_files)?;
         fs::write(dst, html)?;
     }
 

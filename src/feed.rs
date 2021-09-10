@@ -4,13 +4,13 @@ use atom_syndication as atom;
 use pulldown_cmark as md;
 use quick_xml::events::Event;
 use quick_xml::Reader;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 enum State {
-    WaitFeed,
-    WaitInfo,
-    WaitTitle,
-    WaitGenerator,
+    Feed,
+    Info,
+    Title,
+    Generator,
 }
 
 pub struct Meta {
@@ -39,10 +39,10 @@ macro_rules! match_or_continue {
     };
 }
 
-pub fn load_atom_feed(path: &PathBuf) -> quick_xml::Result<Meta> {
+pub fn load_atom_feed(path: &Path) -> quick_xml::Result<Meta> {
     let mut reader = Reader::from_file(path)?;
     let mut buffer = Vec::new();
-    let mut state = State::WaitFeed;
+    let mut state = State::Feed;
 
     let mut title = None;
     let mut link = None;
@@ -54,7 +54,7 @@ pub fn load_atom_feed(path: &PathBuf) -> quick_xml::Result<Meta> {
         buffer.clear();
         let event = reader.read_event(&mut buffer)?;
         state = match state {
-            State::WaitFeed => {
+            State::Feed => {
                 let e = match_or_continue!(Start(event) if event.name() == b"feed");
                 for attr in e.attributes() {
                     let attr = attr?;
@@ -62,10 +62,10 @@ pub fn load_atom_feed(path: &PathBuf) -> quick_xml::Result<Meta> {
                         lang = Some(attr.unescape_and_decode_value(&reader)?);
                     }
                 }
-                State::WaitInfo
+                State::Info
             }
-            State::WaitInfo => match event {
-                Event::Start(e) if e.name() == b"title" => State::WaitTitle,
+            State::Info => match event {
+                Event::Start(e) if e.name() == b"title" => State::Title,
                 Event::Start(e) if e.name() == b"generator" => {
                     for attr in e.attributes() {
                         let attr = attr?;
@@ -73,7 +73,7 @@ pub fn load_atom_feed(path: &PathBuf) -> quick_xml::Result<Meta> {
                             generator_uri = Some(attr.unescape_and_decode_value(&reader)?);
                         }
                     }
-                    State::WaitGenerator
+                    State::Generator
                 }
                 Event::Start(e) | Event::Empty(e) if e.name() == b"link" => {
                     for attr in e.attributes() {
@@ -87,13 +87,13 @@ pub fn load_atom_feed(path: &PathBuf) -> quick_xml::Result<Meta> {
                 Event::Eof => break,
                 _ => continue,
             },
-            State::WaitTitle => {
+            State::Title => {
                 title = Some(match_or_continue!(Text(event)).unescape_and_decode(&reader)?);
-                State::WaitInfo
+                State::Info
             }
-            State::WaitGenerator => {
+            State::Generator => {
                 generator = Some(match_or_continue!(Text(event)).unescape_and_decode(&reader)?);
-                State::WaitInfo
+                State::Info
             }
         };
     }
@@ -121,7 +121,7 @@ pub fn load_atom_feed(path: &PathBuf) -> quick_xml::Result<Meta> {
     };
 
     Ok(Meta {
-        path: path.clone(),
+        path: path.to_path_buf(),
         title,
         link,
         lang,
@@ -130,7 +130,7 @@ pub fn load_atom_feed(path: &PathBuf) -> quick_xml::Result<Meta> {
     })
 }
 
-pub fn fill_atom_feed(feed: Meta, md_files: &Vec<Post>) -> String {
+pub fn fill_atom_feed(feed: Meta, md_files: &[Post]) -> String {
     let parent = feed.path.parent().unwrap();
 
     let mut entries = Vec::new();
@@ -184,7 +184,7 @@ pub fn fill_atom_feed(feed: Meta, md_files: &Vec<Post>) -> String {
         );
     }
 
-    return atom::Feed {
+    atom::Feed {
         title: feed.title.clone().into(),
         id: feed.link.clone(),
         updated: last_updated
@@ -210,5 +210,5 @@ pub fn fill_atom_feed(feed: Meta, md_files: &Vec<Post>) -> String {
         ],
         ..atom::Feed::default()
     }
-    .to_string();
+    .to_string()
 }

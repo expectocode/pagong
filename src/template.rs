@@ -1,4 +1,7 @@
-use crate::config::{INCLUDE_RAW_EXTENSIONS, TEMPLATE_CLOSE_MARKER, TEMPLATE_OPEN_MARKER};
+use crate::config::{
+    INCLUDE_RAW_EXTENSIONS, META_KEY_CATEGORY, META_KEY_CREATION_DATE, META_KEY_MODIFIED_DATE,
+    META_KEY_TAGS, META_KEY_TEMPLATE, META_KEY_TITLE, TEMPLATE_CLOSE_MARKER, TEMPLATE_OPEN_MARKER,
+};
 use crate::{utils, Post};
 
 use pulldown_cmark::{self as md, Parser};
@@ -16,13 +19,34 @@ const RULE_META: &str = "META";
 const RULE_INCLUDE: &str = "INCLUDE";
 
 #[derive(Clone)]
+enum MetaKey {
+    Title,
+    CreationDate,
+    ModifiedDate,
+    Category,
+    Tags,
+    Template,
+    Meta(String),
+}
+
+#[derive(Clone)]
 enum PreprocessorRule {
     Contents,
     Css,
-    Toc { depth: u8 },
-    Listing { path: String },
-    Meta { key: String },
-    Include { path: String },
+    Toc {
+        depth: u8,
+    },
+    Listing {
+        path: String,
+        /// (meta key, ascending?)
+        sort_by: Option<(MetaKey, bool)>,
+    },
+    Meta {
+        key: String,
+    },
+    Include {
+        path: String,
+    },
 }
 
 #[derive(Clone)]
@@ -34,6 +58,26 @@ struct Replacement {
 pub struct HtmlTemplate {
     html: String,
     replacements: Vec<Replacement>,
+}
+
+impl MetaKey {
+    fn new(value: String) -> Self {
+        if value == META_KEY_TITLE {
+            Self::Title
+        } else if value == META_KEY_CREATION_DATE {
+            Self::CreationDate
+        } else if value == META_KEY_MODIFIED_DATE {
+            Self::ModifiedDate
+        } else if value == META_KEY_CATEGORY {
+            Self::Category
+        } else if value == META_KEY_TAGS {
+            Self::Tags
+        } else if value == META_KEY_TEMPLATE {
+            Self::Template
+        } else {
+            Self::Meta(value)
+        }
+    }
 }
 
 impl PreprocessorRule {
@@ -58,7 +102,29 @@ impl PreprocessorRule {
             }
             RULE_LIST => {
                 let path = utils::parse_next_value(parsing)?;
-                PreprocessorRule::Listing { path }
+
+                let mut sort_by = None;
+                while let Some(arg) = utils::parse_next_value(parsing) {
+                    match arg.as_ref() {
+                        "sort" => {
+                            match (
+                                utils::parse_next_value(parsing),
+                                utils::parse_next_value(parsing),
+                            ) {
+                                (Some(key), Some(order)) if order == "asc" || order == "desc" => {
+                                    sort_by = Some((MetaKey::new(key), order == "asc"));
+                                }
+                                (key, order) => eprintln!(
+                                    "note: sort requires key and asc/desc order, but got: {:?}, {:?}",
+                                    key, order
+                                ),
+                            }
+                        }
+                        _ => eprintln!("note: unrecognized list argument: {}", arg),
+                    }
+                }
+
+                PreprocessorRule::Listing { path, sort_by }
             }
             RULE_META => {
                 let key = utils::parse_next_value(parsing)?;
@@ -185,10 +251,33 @@ impl HtmlTemplate {
 
                     res
                 }
-                PreprocessorRule::Listing { path } => {
+                PreprocessorRule::Listing { path, sort_by } => {
                     let path = utils::get_abs_path(root, &md.path, &path);
 
-                    // TODO would like ordering and different formattings
+                    let mut sorted_files;
+                    let mut files = files;
+                    if let Some((key, asc)) = sort_by {
+                        sorted_files = files.to_vec();
+                        sorted_files.sort_by(|a, b| {
+                            let ordering = match &key {
+                                MetaKey::Title => a.title.cmp(&b.title),
+                                MetaKey::CreationDate => a.date.cmp(&b.date),
+                                MetaKey::ModifiedDate => a.updated.cmp(&b.updated),
+                                MetaKey::Category => a.category.cmp(&b.category),
+                                MetaKey::Tags => a.tags.cmp(&b.tags),
+                                MetaKey::Template => a.template.cmp(&b.template),
+                                MetaKey::Meta(key) => a.meta.get(key).cmp(&b.meta.get(key)),
+                            };
+
+                            if asc {
+                                ordering
+                            } else {
+                                ordering.reverse()
+                            }
+                        });
+                        files = sorted_files.as_slice();
+                    }
+
                     let mut res = String::new();
                     res.push_str("<ul>");
                     for file in files {

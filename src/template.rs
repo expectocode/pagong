@@ -1,4 +1,5 @@
-use crate::{utils, Post, TEMPLATE_CLOSE_MARKER, TEMPLATE_OPEN_MARKER};
+use crate::config::{TEMPLATE_CLOSE_MARKER, TEMPLATE_OPEN_MARKER};
+use crate::{utils, Post};
 
 use pulldown_cmark::Parser;
 use std::cmp::Ordering;

@@ -1,5 +1,5 @@
-use crate::{
-    DIST_FILE_EXT, META_KEY_CATEGORY, META_KEY_CREATION_DATE, META_KEY_MODIFIED_DATE,
+use crate::config::{
+    Config, DATE_FMT, META_KEY_CATEGORY, META_KEY_CREATION_DATE, META_KEY_MODIFIED_DATE,
     META_KEY_TAGS, META_KEY_TEMPLATE, META_KEY_TITLE, META_TAG_SEPARATOR, META_VALUE_SEPARATOR,
     SOURCE_META_KEY,
 };
@@ -45,7 +45,7 @@ pub struct Post {
 
 impl Post {
     /// Parse a markdown file into a `Post`.
-    pub fn new(root: &Path, path: PathBuf) -> io::Result<Self> {
+    pub fn new(config: &Config, root: &Path, path: PathBuf) -> io::Result<Self> {
         // UTF-8 BOM becomes zero-width non-breaking space, which `trim()` won't remove,
         // but if we leave it there then metadata loading will break and not recognise
         // where the meta code block starts correctly.
@@ -95,7 +95,7 @@ impl Post {
         let metadata = fs::metadata(&path)?;
         let date = meta
             .get(META_KEY_CREATION_DATE)
-            .and_then(|date| NaiveDate::parse_from_str(date, crate::DATE_FMT).ok())
+            .and_then(|date| NaiveDate::parse_from_str(date, DATE_FMT).ok())
             .or_else(|| {
                 metadata
                     .created()
@@ -114,7 +114,7 @@ impl Post {
 
         let updated = meta
             .get(META_KEY_MODIFIED_DATE)
-            .and_then(|date| NaiveDate::parse_from_str(date, crate::DATE_FMT).ok())
+            .and_then(|date| NaiveDate::parse_from_str(date, DATE_FMT).ok())
             .or_else(|| {
                 metadata
                     .modified()
@@ -154,7 +154,7 @@ impl Post {
             .get(META_KEY_TEMPLATE)
             .map(|s| crate::utils::get_abs_path(root, Some(&path), s));
 
-        let uri = crate::utils::path_to_uri(root, &path.with_extension(DIST_FILE_EXT));
+        let uri = crate::utils::path_to_uri(root, &path.with_extension(&config.dist_ext));
 
         let toc = {
             let mut toc_depth = None;

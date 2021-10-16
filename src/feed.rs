@@ -1,4 +1,5 @@
-use crate::{Post, FEED_CONTENT_TYPE, FEED_REL, FEED_TYPE};
+use crate::config::{FEED_CONTENT_TYPE, FEED_REL, FEED_TYPE};
+use crate::Post;
 
 use atom_syndication as atom;
 use pulldown_cmark as md;

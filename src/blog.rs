@@ -1,7 +1,5 @@
-use crate::{
-    feed, utils, HtmlTemplate, Post, DEFAULT_HTML_TEMPLATE, DIST_FILE_EXT, FEED_FILE_EXT,
-    SOURCE_FILE_EXT, STYLE_FILE_EXT,
-};
+use crate::config::{Config, SOURCE_FILE_EXT, STYLE_FILE_EXT};
+use crate::{feed, utils, HtmlTemplate, Post};
 
 use std::collections::{HashMap, HashSet};
 use std::fs;
@@ -28,7 +26,7 @@ pub struct Scan {
 }
 
 /// Scan a directory containing a blog made up of markdown files, templates and assets.
-pub fn scan_dir(root: PathBuf) -> io::Result<Scan> {
+pub fn scan_dir(config: &Config, root: PathBuf) -> io::Result<Scan> {
     let mut dirs_to_create = Vec::new();
     let mut css_files = Vec::new();
     let mut atom_files = Vec::new();
@@ -59,7 +57,7 @@ pub fn scan_dir(root: PathBuf) -> io::Result<Scan> {
                     css_files.push(utils::path_to_uri(&root, &entry.path()));
                 }
 
-                if ext.eq_ignore_ascii_case(FEED_FILE_EXT) {
+                if ext.eq_ignore_ascii_case(&config.feed_ext) {
                     match feed::load_atom_feed(&entry.path()) {
                         Ok(atom) => atom_files.push(atom),
                         Err(e) => {
@@ -72,7 +70,7 @@ pub fn scan_dir(root: PathBuf) -> io::Result<Scan> {
                     files_to_copy.push(entry.path());
                 } else {
                     // Parses all MD files.
-                    let md = Post::new(&root, entry.path())?;
+                    let md = Post::new(config, &root, entry.path())?;
                     if let Some(template) = md.template.as_ref() {
                         templates.insert(template.clone());
                     }
@@ -86,7 +84,7 @@ pub fn scan_dir(root: PathBuf) -> io::Result<Scan> {
     files_to_copy.retain(|path| !templates.contains(path));
 
     // Parse templates.
-    let default_template = HtmlTemplate::new(&root, None, DEFAULT_HTML_TEMPLATE.to_owned());
+    let default_template = HtmlTemplate::new(&root, None, config.template.clone());
     let html_templates = templates
         .into_iter()
         .filter_map(|path| match HtmlTemplate::load(&root, &path) {
@@ -111,7 +109,7 @@ pub fn scan_dir(root: PathBuf) -> io::Result<Scan> {
 }
 
 /// Generate a blog from a previous `Scan`, turning all source files into HTML.
-pub fn generate_from_scan(scan: Scan, destination: PathBuf) -> io::Result<()> {
+pub fn generate_from_scan(config: &Config, scan: Scan, destination: PathBuf) -> io::Result<()> {
     if !destination.is_dir() {
         fs::create_dir(&destination)?;
     }
@@ -173,7 +171,7 @@ pub fn generate_from_scan(scan: Scan, destination: PathBuf) -> io::Result<()> {
         let src = file
             .path
             .clone()
-            .with_extension(DIST_FILE_EXT)
+            .with_extension(&config.dist_ext)
             .into_os_string()
             .into_string()
             .expect("bad md path");
@@ -182,9 +180,9 @@ pub fn generate_from_scan(scan: Scan, destination: PathBuf) -> io::Result<()> {
         let (contents, template) = match file.template.clone() {
             Some(tp) => match scan.html_templates.get(&tp) {
                 Some(t) => (fs::read_to_string(tp)?, t),
-                None => (DEFAULT_HTML_TEMPLATE.to_owned(), &scan.default_template),
+                None => (config.template.clone(), &scan.default_template),
             },
-            None => (DEFAULT_HTML_TEMPLATE.to_owned(), &scan.default_template),
+            None => (config.template.clone(), &scan.default_template),
         };
 
         let html = template.apply(contents, file, &scan.md_files, &scan.css_files)?;

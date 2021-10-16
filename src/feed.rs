@@ -131,7 +131,7 @@ pub fn load_atom_feed(path: &Path) -> quick_xml::Result<Meta> {
     })
 }
 
-pub fn fill_atom_feed(feed: Meta, md_files: &[Post]) -> String {
+pub fn fill_atom_feed(feed: &Meta, md_files: &[Post]) -> String {
     let parent = feed.path.parent().unwrap();
 
     let mut entries = Vec::new();
@@ -199,7 +199,7 @@ pub fn fill_atom_feed(feed: Meta, md_files: &[Post]) -> String {
         }),
         links: vec![
             atom::Link {
-                href: feed.link,
+                href: feed.link.clone(),
                 ..atom::Link::default()
             },
             atom::Link {

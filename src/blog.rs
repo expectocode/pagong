@@ -17,8 +17,6 @@ pub struct Scan {
     css_files: Vec<String>,
     /// HTML templates found.
     html_templates: HashMap<PathBuf, HtmlTemplate>,
-    /// HTML template to use when no other file can be used.
-    default_template: HtmlTemplate,
     /// Markdown files to parse and generate HTML from.
     md_files: Vec<Post>,
     /// ATOM feeds to fill.
@@ -84,10 +82,9 @@ pub fn scan_dir(config: &Config, root: PathBuf) -> io::Result<Scan> {
     files_to_copy.retain(|path| !templates.contains(path));
 
     // Parse templates.
-    let default_template = HtmlTemplate::new(&root, None, config.template.clone());
     let html_templates = templates
         .into_iter()
-        .filter_map(|path| match HtmlTemplate::load(&root, &path) {
+        .filter_map(|path| match HtmlTemplate::from_file(&path) {
             Ok(template) => Some((path, template)),
             Err(_) => {
                 eprintln!("note: failed to parse html template: {:?}", path);
@@ -102,7 +99,6 @@ pub fn scan_dir(config: &Config, root: PathBuf) -> io::Result<Scan> {
         files_to_copy,
         css_files,
         html_templates,
-        default_template,
         md_files,
         atom_files,
     })
@@ -154,7 +150,7 @@ pub fn generate_from_scan(config: &Config, scan: Scan, destination: PathBuf) -> 
     }
 
     // Generate all feeds.
-    for atom in scan.atom_files {
+    for atom in scan.atom_files.iter() {
         let src = atom
             .path
             .clone()
@@ -177,15 +173,13 @@ pub fn generate_from_scan(config: &Config, scan: Scan, destination: PathBuf) -> 
             .expect("bad md path");
         let dst = utils::replace_root(&source, &destination, &src);
 
-        let (contents, template) = match file.template.clone() {
-            Some(tp) => match scan.html_templates.get(&tp) {
-                Some(t) => (fs::read_to_string(tp)?, t),
-                None => (config.template.clone(), &scan.default_template),
-            },
-            None => (config.template.clone(), &scan.default_template),
-        };
+        let template = file
+            .template
+            .as_ref()
+            .and_then(|t| scan.html_templates.get(t))
+            .unwrap_or(&config.template);
 
-        let html = template.apply(contents, file, &scan.md_files, &scan.css_files)?;
+        let html = template.apply(&scan.root, file, &scan.md_files, &scan.css_files)?;
         fs::write(dst, html)?;
     }
 

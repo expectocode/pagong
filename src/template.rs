@@ -6,7 +6,7 @@ use std::cmp::Ordering;
 use std::fs;
 use std::io;
 use std::ops::Range;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 const RULE_CONTENTS: &str = "CONTENTS";
 const RULE_CSS: &str = "CSS";
@@ -20,9 +20,9 @@ enum PreprocessorRule {
     Contents,
     Css,
     Toc { depth: u8 },
-    Listing { path: PathBuf },
+    Listing { path: String },
     Meta { key: String },
-    Include { path: PathBuf },
+    Include { path: String },
 }
 
 #[derive(Clone)]
@@ -32,11 +32,12 @@ struct Replacement {
 }
 
 pub struct HtmlTemplate {
+    html: String,
     replacements: Vec<Replacement>,
 }
 
 impl PreprocessorRule {
-    fn new(root: &Path, path: Option<&Path>, mut string: &str) -> Option<Self> {
+    fn new(mut string: &str) -> Option<Self> {
         let parsing = &mut string;
         let rule = utils::parse_next_value(parsing)?;
         Some(match rule.as_str() {
@@ -56,7 +57,7 @@ impl PreprocessorRule {
                 PreprocessorRule::Toc { depth }
             }
             RULE_LIST => {
-                let path = utils::get_abs_path(root, path, &utils::parse_next_value(parsing)?);
+                let path = utils::parse_next_value(parsing)?;
                 PreprocessorRule::Listing { path }
             }
             RULE_META => {
@@ -64,7 +65,7 @@ impl PreprocessorRule {
                 PreprocessorRule::Meta { key }
             }
             RULE_INCLUDE => {
-                let path = utils::get_abs_path(root, path, &utils::parse_next_value(parsing)?);
+                let path = utils::parse_next_value(parsing)?;
                 PreprocessorRule::Include { path }
             }
             _ => return None,
@@ -73,17 +74,21 @@ impl PreprocessorRule {
 }
 
 impl HtmlTemplate {
-    pub fn load(root: &Path, path: &Path) -> io::Result<Self> {
-        let contents = fs::read_to_string(&path)?;
-        Ok(Self::new(root, Some(path), contents))
+    pub fn from_file<P: AsRef<Path>>(path: P) -> io::Result<Self> {
+        let html = fs::read_to_string(path.as_ref())?;
+        Ok(Self::new(html, Some(path.as_ref())))
     }
 
-    pub fn new(root: &Path, path: Option<&Path>, contents: String) -> Self {
+    pub fn from_string(html: String) -> Self {
+        Self::new(html, None)
+    }
+
+    fn new(html: String, path: Option<&Path>) -> Self {
         let mut replacements = Vec::new();
         let mut offset = 0;
-        while let Some(index) = contents[offset..].find(TEMPLATE_OPEN_MARKER) {
+        while let Some(index) = html[offset..].find(TEMPLATE_OPEN_MARKER) {
             let rule_start = offset + index + TEMPLATE_OPEN_MARKER.len();
-            let rule_end = match contents[rule_start..].find(TEMPLATE_CLOSE_MARKER) {
+            let rule_end = match html[rule_start..].find(TEMPLATE_CLOSE_MARKER) {
                 Some(i) => rule_start + i,
                 None => {
                     eprintln!(
@@ -94,8 +99,8 @@ impl HtmlTemplate {
                 }
             };
 
-            let rule = &contents[rule_start..rule_end];
-            match PreprocessorRule::new(root, path, rule) {
+            let rule = &html[rule_start..rule_end];
+            match PreprocessorRule::new(rule) {
                 Some(rule) => replacements.push(Replacement {
                     range: (offset + index)..(rule_end + TEMPLATE_CLOSE_MARKER.len()),
                     rule,
@@ -110,16 +115,17 @@ impl HtmlTemplate {
 
             offset = rule_end + TEMPLATE_CLOSE_MARKER.len();
         }
-        Self { replacements }
+        Self { html, replacements }
     }
 
     pub fn apply(
         &self,
-        mut html: String,
+        root: &Path,
         md: &Post,
         files: &[Post],
         css_files: &[String],
     ) -> io::Result<String> {
+        let mut html = self.html.clone();
         let mut replacements = self.replacements.clone();
         replacements.sort_by_key(|r| r.range.start);
 
@@ -180,6 +186,8 @@ impl HtmlTemplate {
                     res
                 }
                 PreprocessorRule::Listing { path } => {
+                    let path = utils::get_abs_path(root, &md.path, &path);
+
                     // TODO would like ordering and different formattings
                     let mut res = String::new();
                     res.push_str("<ul>");
@@ -199,13 +207,17 @@ impl HtmlTemplate {
                     md.meta.get(&key).cloned().unwrap_or_else(String::new)
                 }
                 // TODO escape non-html
-                PreprocessorRule::Include { path } => match fs::read_to_string(&path) {
-                    Ok(s) => s,
-                    Err(_) => {
-                        eprintln!("note: failed to include {:?}", path);
-                        continue;
+                PreprocessorRule::Include { path } => {
+                    let path = utils::get_abs_path(root, &md.path, &path);
+
+                    match fs::read_to_string(&path) {
+                        Ok(s) => s,
+                        Err(_) => {
+                            eprintln!("note: failed to include {:?}", path);
+                            continue;
+                        }
                     }
-                },
+                }
             };
 
             html.replace_range(replacement.range, &value);

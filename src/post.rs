@@ -152,7 +152,7 @@ impl Post {
 
         let template = meta
             .get(META_KEY_TEMPLATE)
-            .map(|s| crate::utils::get_abs_path(root, Some(&path), s));
+            .map(|s| crate::utils::get_abs_path(root, &path, s));
 
         let uri = crate::utils::path_to_uri(root, &path.with_extension(&config.dist_ext));
 

@@ -103,17 +103,21 @@ This comment will tell pagong to automatically generate a Table of Contents for 
 <!--P/ TOC /P-->
 <!--P/ TOC 3 /P-->
 
-This comment will tell pagong to automatically generate a list of files in the given path (relative to the current HTML template file):
+This comment will tell pagong to automatically generate a list of files in the given path (relative to the current markdown file):
 <!--P/ LIST path /P-->
 
 This comment will get replaced with whatever was put in the specified metadata key (in this example, the title):
 <!--P/ META title /P-->
 
-This comment will get replaced with the contents of whatever path is specified (relative to the current HTML template file). HTML files won't be escaped, but everything else will:
+This comment will get replaced with the contents of whatever path is specified (relative to the current markdown file). HTML files won't be escaped, but everything else will:
 <!--P/ INCLUDE path /P-->
 ```
 
 When replacing the "pre-processor" rules, the code will look exactly for the strings `<!--P/` and `/P-->`, so make sure to not introduce spaces in-between. If any of the values to the pre-processor rules contain spaces, surround them in double-quotes (`"`). The only escape sequences allowed inside double-quotes are `\"` in order to escape a quote, and `\\` in order to escape the backslash character.
+
+A default [`template.html`] file is embedded withing `pagong` itself. It will be used when no other template file is specified, in order to generate valid HTML5 (your HTML needs a body, after all).
+
+[`template.html`]: https://github.com/Lonami/pagong/blob/master/template.html
 
 ### Feed
 

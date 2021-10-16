@@ -1,6 +1,7 @@
+use crate::HtmlTemplate;
+
 use clap::{App, Arg};
 use std::env;
-use std::fs;
 use std::io;
 use std::path::PathBuf;
 
@@ -38,7 +39,7 @@ pub const FEED_TYPE: &str = "application/atom+xml";
 
 pub struct Config {
     pub root: PathBuf,
-    pub template: String,
+    pub template: HtmlTemplate,
     pub dist_ext: String,
     pub feed_ext: String,
 }
@@ -76,8 +77,8 @@ pub fn parse_cli_args() -> io::Result<Config> {
     };
 
     let template = match config.value_of("template") {
-        Some(path) => fs::read_to_string(path)?,
-        None => DEFAULT_HTML_TEMPLATE.to_string(),
+        Some(path) => HtmlTemplate::from_file(path)?,
+        None => HtmlTemplate::from_string(DEFAULT_HTML_TEMPLATE.to_string()),
     };
 
     let dist_ext = match config.value_of("dist_ext") {

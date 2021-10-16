@@ -64,15 +64,13 @@ pub fn parse_next_value(string: &mut &str) -> Option<String> {
 }
 
 /// Get the absolute path out of value given the root and the path of the file being processed.
-pub fn get_abs_path(root: &Path, path: Option<&Path>, value: &str) -> PathBuf {
+pub fn get_abs_path(root: &Path, path: &Path, value: &str) -> PathBuf {
     if let Some(absolute) = value.strip_prefix('/') {
         let mut p = root.to_path_buf();
         p.push(absolute);
         p
     } else {
-        let mut p = path
-            .map(|p| p.parent().unwrap().to_owned())
-            .unwrap_or_else(|| root.to_path_buf());
+        let mut p = path.parent().unwrap().to_owned();
         p.push(value);
         p
     }

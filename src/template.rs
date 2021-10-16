@@ -1,7 +1,7 @@
-use crate::config::{TEMPLATE_CLOSE_MARKER, TEMPLATE_OPEN_MARKER};
+use crate::config::{INCLUDE_RAW_EXTENSIONS, TEMPLATE_CLOSE_MARKER, TEMPLATE_OPEN_MARKER};
 use crate::{utils, Post};
 
-use pulldown_cmark::Parser;
+use pulldown_cmark::{self as md, Parser};
 use std::cmp::Ordering;
 use std::fs;
 use std::io;
@@ -206,12 +206,28 @@ impl HtmlTemplate {
                 PreprocessorRule::Meta { key } => {
                     md.meta.get(&key).cloned().unwrap_or_else(String::new)
                 }
-                // TODO escape non-html
                 PreprocessorRule::Include { path } => {
                     let path = utils::get_abs_path(root, &md.path, &path);
 
                     match fs::read_to_string(&path) {
-                        Ok(s) => s,
+                        Ok(s) => {
+                            if INCLUDE_RAW_EXTENSIONS.contains(
+                                &path
+                                    .extension()
+                                    .unwrap()
+                                    .to_ascii_lowercase()
+                                    .to_str()
+                                    .unwrap(),
+                            ) {
+                                s
+                            } else {
+                                // Add a fourth to the capacity to leave some room for the escapes.
+                                // This is merely a best-effort guess to avoid re-allocating.
+                                let mut escaped = String::with_capacity(s.len() + s.len() / 4);
+                                md::escape::escape_html(&mut escaped, &s).unwrap();
+                                escaped
+                            }
+                        }
                         Err(_) => {
                             eprintln!("note: failed to include {:?}", path);
                             continue;

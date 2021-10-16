@@ -25,6 +25,7 @@ pub const META_TAG_SEPARATOR: &str = ",";
 pub const DEFAULT_HTML_TEMPLATE: &str = std::include_str!("../template.html");
 pub const TEMPLATE_OPEN_MARKER: &str = "<!--P/";
 pub const TEMPLATE_CLOSE_MARKER: &str = "/P-->";
+pub const INCLUDE_RAW_EXTENSIONS: [&str; 4] = ["html", "htm", "xhtml", "xht"];
 
 // Blog options.
 pub const SOURCE_FILE_EXT: &str = "md";

@@ -231,7 +231,7 @@ impl HtmlTemplate {
                         let parent = &css[..css.rfind('/').unwrap()];
                         if md.uri.starts_with(parent) {
                             res.push_str(r#"<link rel="stylesheet" type="text/css" href=""#);
-                            res.push_str(css);
+                            res.push_str(&utils::get_relative_uri(&md.uri, css));
                             res.push_str("\">");
                         }
                     }

@@ -40,6 +40,7 @@ enum PreprocessorRule {
         path: String,
         /// (meta key, ascending?)
         sort_by: Option<(MetaKey, bool)>,
+        max_depth: Option<usize>,
     },
     Meta {
         key: String,
@@ -104,6 +105,7 @@ impl PreprocessorRule {
                 let path = utils::parse_next_value(parsing)?;
 
                 let mut sort_by = None;
+                let mut max_depth = None;
                 while let Some(arg) = utils::parse_next_value(parsing) {
                     match arg.as_ref() {
                         "sort" => {
@@ -120,11 +122,22 @@ impl PreprocessorRule {
                                 ),
                             }
                         }
+                        "depth" => match utils::parse_next_value(parsing) {
+                            Some(depth) => match depth.parse() {
+                                Ok(depth) => max_depth = Some(depth),
+                                Err(e) => eprintln!("note: depth was not a number: {}", e),
+                            },
+                            None => eprintln!("note: depth requires a number"),
+                        },
                         _ => eprintln!("note: unrecognized list argument: {}", arg),
                     }
                 }
 
-                PreprocessorRule::Listing { path, sort_by }
+                PreprocessorRule::Listing {
+                    path,
+                    sort_by,
+                    max_depth,
+                }
             }
             RULE_META => {
                 let key = utils::parse_next_value(parsing)?;
@@ -254,7 +267,11 @@ impl HtmlTemplate {
 
                     res
                 }
-                PreprocessorRule::Listing { path, sort_by } => {
+                PreprocessorRule::Listing {
+                    path,
+                    sort_by,
+                    max_depth,
+                } => {
                     let path = utils::get_abs_path(root, &md.path, &path);
 
                     let mut sorted_files;
@@ -285,8 +302,15 @@ impl HtmlTemplate {
                     res.push_str("<ul>");
                     for file in files {
                         if file.path.starts_with(&path) {
+                            let rel = utils::get_relative_uri(&md.uri, &file.uri);
+                            if let Some(depth) = max_depth {
+                                if rel.matches('/').count() >= depth {
+                                    continue;
+                                }
+                            }
+
                             res.push_str("<li><a href=\"");
-                            res.push_str(&utils::get_relative_uri(&md.uri, &file.uri));
+                            res.push_str(&rel);
                             res.push_str("\">");
                             res.push_str(&file.title);
                             res.push_str("</a></li>");

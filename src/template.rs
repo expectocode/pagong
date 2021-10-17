@@ -201,7 +201,7 @@ impl HtmlTemplate {
                     let mut res = String::new();
                     pulldown_cmark::html::push_html(
                         &mut res,
-                        Parser::new(&md.markdown).hyperlink_headings(),
+                        Parser::new_ext(&md.markdown, md::Options::all()).hyperlink_headings(),
                     );
                     res
                 }

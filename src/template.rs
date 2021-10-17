@@ -41,6 +41,7 @@ enum PreprocessorRule {
         /// (meta key, ascending?)
         sort_by: Option<(MetaKey, bool)>,
         max_depth: Option<usize>,
+        skip: Vec<String>,
     },
     Meta {
         key: String,
@@ -106,6 +107,7 @@ impl PreprocessorRule {
 
                 let mut sort_by = None;
                 let mut max_depth = None;
+                let mut skip = Vec::new();
                 while let Some(arg) = utils::parse_next_value(parsing) {
                     match arg.as_ref() {
                         "sort" => {
@@ -129,6 +131,10 @@ impl PreprocessorRule {
                             },
                             None => eprintln!("note: depth requires a number"),
                         },
+                        "skip" => match utils::parse_next_value(parsing) {
+                            Some(uri) => skip.push(uri),
+                            None => eprintln!("note: skip requires a relative uri"),
+                        },
                         _ => eprintln!("note: unrecognized list argument: {}", arg),
                     }
                 }
@@ -137,6 +143,7 @@ impl PreprocessorRule {
                     path,
                     sort_by,
                     max_depth,
+                    skip,
                 }
             }
             RULE_META => {
@@ -271,6 +278,7 @@ impl HtmlTemplate {
                     path,
                     sort_by,
                     max_depth,
+                    skip,
                 } => {
                     let path = utils::get_abs_path(root, &md.path, &path);
 
@@ -300,12 +308,18 @@ impl HtmlTemplate {
 
                     let mut res = String::new();
                     res.push_str("<ul>");
-                    for file in files {
+                    'files: for file in files {
                         if file.path.starts_with(&path) {
                             let rel = utils::get_relative_uri(&md.uri, &file.uri);
                             if let Some(depth) = max_depth {
                                 if rel.matches('/').count() >= depth {
-                                    continue;
+                                    continue 'files;
+                                }
+                            }
+
+                            for uri in skip.iter() {
+                                if rel.starts_with(uri) {
+                                    continue 'files;
                                 }
                             }
 

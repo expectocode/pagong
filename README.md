@@ -103,10 +103,11 @@ This comment will tell pagong to automatically generate a Table of Contents for 
 <!--P/ TOC /P-->
 <!--P/ TOC 3 /P-->
 
-This comment will tell pagong to automatically generate a list of files in the given path (relative to the current markdown file). You may optionally sort by a meta key in either asc-ending or desc-ending order. You may optionally set a maximum depth:
+This comment will tell pagong to automatically generate a list of files in the given path (relative to the current markdown file). You may optionally sort by a meta key in either asc-ending or desc-ending order. You may optionally set a maximum depth. You may optionally skip certain relative URIs. You may combine all of these settings:
 <!--P/ LIST path /P-->
 <!--P/ LIST path sort updated desc /P-->
 <!--P/ LIST path depth 2 /P-->
+<!--P/ LIST path skip index.html skip secret.html /P-->
 
 This comment will get replaced with whatever was put in the specified metadata key (in this example, the title):
 <!--P/ META title /P-->

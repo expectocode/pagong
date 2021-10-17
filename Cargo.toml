@@ -16,3 +16,4 @@ chrono = "0.4"
 pulldown-cmark = "0.8"
 anyhow = "1.0"
 clap = { version = "2", default-features = false }
+hyperbuild = "0.2.4"  # whitespace removal is necessary for some tags such as <li>

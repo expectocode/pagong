@@ -1,4 +1,4 @@
-use crate::config::{Config, SOURCE_FILE_EXT, STYLE_FILE_EXT};
+use crate::config::{Config, Minify, SOURCE_FILE_EXT, STYLE_FILE_EXT};
 use crate::{feed, utils, HtmlTemplate, Post};
 
 use std::collections::{HashMap, HashSet};
@@ -180,6 +180,27 @@ pub fn generate_from_scan(config: &Config, scan: Scan, destination: PathBuf) -> 
             .unwrap_or(&config.template);
 
         let html = template.apply(&scan.root, file, &scan.md_files, &scan.css_files)?;
+
+        let html = match config.minify {
+            Minify::no => html,
+            Minify::yes | Minify::full => {
+                let mut html = html.into_bytes();
+                match hyperbuild::hyperbuild(
+                    &mut html,
+                    &hyperbuild::Cfg {
+                        minify_js: matches!(config.minify, Minify::full),
+                    },
+                ) {
+                    Ok(n) => html.truncate(n),
+                    Err((e, n)) => eprintln!(
+                        "note: could not minify: pos={}, cause={:?}, file={:?}",
+                        n, e, file.path
+                    ),
+                };
+                String::from_utf8(html).unwrap()
+            }
+        };
+
         fs::write(dst, html)?;
     }
 

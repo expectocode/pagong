@@ -1,6 +1,6 @@
 use crate::HtmlTemplate;
 
-use clap::{App, Arg};
+use clap::{arg_enum, value_t, App, Arg};
 use std::env;
 use std::io;
 use std::path::PathBuf;
@@ -26,6 +26,7 @@ pub const DEFAULT_HTML_TEMPLATE: &str = std::include_str!("../template.html");
 pub const TEMPLATE_OPEN_MARKER: &str = "<!--P/";
 pub const TEMPLATE_CLOSE_MARKER: &str = "/P-->";
 pub const INCLUDE_RAW_EXTENSIONS: [&str; 4] = ["html", "htm", "xhtml", "xht"];
+pub const DEFAULT_MINIFY_LEVEL: &str = "yes";
 
 // Blog options.
 pub const SOURCE_FILE_EXT: &str = "md";
@@ -38,11 +39,22 @@ pub const FEED_CONTENT_TYPE: &str = "html";
 pub const FEED_REL: &str = "self";
 pub const FEED_TYPE: &str = "application/atom+xml";
 
+arg_enum! {
+    #[derive(PartialEq, Debug)]
+    #[allow(non_camel_case_types)]
+    pub enum Minify {
+        no,
+        yes,
+        full
+    }
+}
+
 pub struct Config {
     pub root: PathBuf,
     pub template: HtmlTemplate,
     pub dist_ext: String,
     pub feed_ext: String,
+    pub minify: Minify,
 }
 
 pub fn parse_cli_args() -> io::Result<Config> {
@@ -70,6 +82,14 @@ pub fn parse_cli_args() -> io::Result<Config> {
             .long("feed-extension")
             .help("Sets the file extension used for the Atom feed files")
             .default_value("atom"))
+        .arg(Arg::with_name("minify")
+            .value_name("MIN")
+            .short("m")
+            .long("minify")
+            .help("Configures the minification level (recommended for certain HTML elements)")
+            .possible_values(&Minify::variants())
+            .case_insensitive(true)
+            .default_value(DEFAULT_MINIFY_LEVEL))
         .get_matches();
 
     let root = match config.value_of("root") {
@@ -92,10 +112,13 @@ pub fn parse_cli_args() -> io::Result<Config> {
         None => FEED_FILE_EXT.to_string(),
     };
 
+    let minify = value_t!(config, "minify", Minify).unwrap_or_else(|e| e.exit());
+
     Ok(Config {
         root,
         template,
         dist_ext,
         feed_ext,
+        minify,
     })
 }

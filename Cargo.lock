@@ -89,6 +89,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "hyperbuild"
+version = "0.2.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "566342d0128a1f20a71735fadf6cef5dfff6c7a8dc0eb5f7200522d92ad8ac3f"
+dependencies = [
+ "lazy_static",
+ "memchr",
+]
+
+[[package]]
+name = "lazy_static"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e2abad23fbc42b3700f2f279844dc832adb2b2eb069b2df918f455c4e18cc646"
+
+[[package]]
 name = "libc"
 version = "0.2.101"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -127,6 +143,7 @@ dependencies = [
  "atom_syndication",
  "chrono",
  "clap",
+ "hyperbuild",
  "pulldown-cmark",
  "quick-xml",
 ]

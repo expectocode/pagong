@@ -2,7 +2,7 @@ use crate::config::{
     INCLUDE_RAW_EXTENSIONS, META_KEY_CATEGORY, META_KEY_CREATION_DATE, META_KEY_MODIFIED_DATE,
     META_KEY_TAGS, META_KEY_TEMPLATE, META_KEY_TITLE, TEMPLATE_CLOSE_MARKER, TEMPLATE_OPEN_MARKER,
 };
-use crate::{utils, Post};
+use crate::{utils, AdaptorExt as _, Post};
 
 use pulldown_cmark::{self as md, Parser};
 use std::cmp::Ordering;
@@ -199,7 +199,10 @@ impl HtmlTemplate {
             let value = match replacement.rule {
                 PreprocessorRule::Contents => {
                     let mut res = String::new();
-                    pulldown_cmark::html::push_html(&mut res, Parser::new(&md.markdown));
+                    pulldown_cmark::html::push_html(
+                        &mut res,
+                        Parser::new(&md.markdown).hyperlink_headings(),
+                    );
                     res
                 }
                 PreprocessorRule::Css => {

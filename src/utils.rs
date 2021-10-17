@@ -127,6 +127,21 @@ pub fn get_relative_uri(relative_to: &str, uri: &str) -> String {
     result
 }
 
+pub fn generate_heading_id(heading: &str) -> String {
+    let lowercase = heading.to_lowercase();
+    let mut result = String::with_capacity(lowercase.len());
+    let mut first = true;
+    for word in lowercase.split_whitespace() {
+        if first {
+            first = false;
+        } else {
+            result.push('-');
+        }
+        result.push_str(word);
+    }
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

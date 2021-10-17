@@ -1,3 +1,4 @@
+mod adaptor;
 mod blog;
 mod config;
 mod feed;
@@ -5,6 +6,7 @@ mod post;
 mod template;
 mod utils;
 
+use adaptor::AdaptorExt;
 use post::Post;
 use template::HtmlTemplate;
 
